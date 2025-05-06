@@ -37,6 +37,13 @@ func WithDefaultKeychain() remote.Option {
 	return remote.WithAuthFromKeychain(authn.DefaultKeychain)
 }
 
+// WithBearerToken returns a remote.Option for token-based authentication.
+func WithBearerToken(token string) remote.Option {
+	return remote.WithAuth(&authn.Bearer{
+		Token: token,
+	})
+}
+
 // GetImage retrieves an image from a registry.
 func (c *Client) GetImage(ctx context.Context, imageRef string) (v1.Image, error) {
 	ref, err := name.ParseReference(imageRef)

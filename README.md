@@ -68,14 +68,21 @@ Get the config for an OCI image.
 
 The server supports the following authentication methods for accessing private OCI registries:
 
-1. **Username and Password**: Set the following environment variables:
+1. **Bearer Token**: Set the following environment variable:
+   - `OCI_TOKEN`: Bearer token for registry authentication
+
+2. **Username and Password**: Set the following environment variables:
    - `OCI_USERNAME`: Username for registry authentication
    - `OCI_PASSWORD`: Password for registry authentication
 
-2. **Docker Config**: If no username/password is provided, the server will use the default Docker keychain, which reads credentials from `~/.docker/config.json`.
+3. **Docker Config**: If no token or username/password is provided, the server will use the default Docker keychain, which reads credentials from `~/.docker/config.json`.
 
-Example:
+Examples:
 ```bash
+# Bearer token authentication
+export OCI_TOKEN=mytoken
+
+# Username/password authentication
 export OCI_USERNAME=myuser
 export OCI_PASSWORD=mypassword
 ```

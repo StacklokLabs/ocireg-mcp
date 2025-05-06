@@ -44,13 +44,19 @@ func setupContextWithGracefulShutdown() (context.Context, context.CancelFunc) {
 func createOCIClient() *oci.Client {
 	var ociClientOptions []remote.Option
 
-	// Check for username/password authentication
+	// Check for authentication method based on available environment variables
+	token := os.Getenv("OCI_TOKEN")
 	username := os.Getenv("OCI_USERNAME")
 	password := os.Getenv("OCI_PASSWORD")
-	if username != "" && password != "" {
+
+	switch {
+	case token != "":
+		log.Println("Using bearer token authentication for OCI registry")
+		ociClientOptions = append(ociClientOptions, oci.WithBearerToken(token))
+	case username != "" && password != "":
 		log.Println("Using username/password authentication for OCI registry")
 		ociClientOptions = append(ociClientOptions, oci.WithBasicAuth(username, password))
-	} else {
+	default:
 		// If no explicit credentials, use the default keychain
 		// This will use credentials from the Docker config file
 		log.Println("Using default keychain for OCI registry authentication")

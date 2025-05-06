@@ -44,3 +44,9 @@ func TestListTags_InvalidRepository(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "listing tags")
 }
+
+func TestWithBearerToken(t *testing.T) {
+	// Test that WithBearerToken returns a valid remote.Option
+	option := WithBearerToken("test-token")
+	assert.NotNil(t, option)
+}
