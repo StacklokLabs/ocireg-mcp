@@ -23,16 +23,12 @@ var (
 	version = "dev"
 )
 
-func main() {
-	// Parse command-line flags
-	port := flag.Int("port", 8080, "Port to listen on")
-	flag.Parse()
-
-	// Create a context that can be cancelled
+// setupContextWithGracefulShutdown creates a cancellable context and configures signal handling
+// for graceful shutdown on SIGINT and SIGTERM signals
+func setupContextWithGracefulShutdown() (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
-	// Set up signal handling
+	// Set up signal handling for graceful shutdown
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -41,7 +37,11 @@ func main() {
 		cancel()
 	}()
 
-	// Create the OCI client with authentication options
+	return ctx, cancel
+}
+
+// createOCIClient creates an OCI client with appropriate authentication
+func createOCIClient() *oci.Client {
 	var ociClientOptions []remote.Option
 
 	// Check for username/password authentication
@@ -57,13 +57,13 @@ func main() {
 		ociClientOptions = append(ociClientOptions, oci.WithDefaultKeychain())
 	}
 
-	ociClient := oci.NewClient(ociClientOptions...)
+	return oci.NewClient(ociClientOptions...)
+}
 
+// setupServer creates and configures the MCP server with tools
+func setupServer(ociClient *oci.Client, serverName, serverVersion string) *mcpserver.SSEServer {
 	// Create the tool provider
 	toolProvider := mcp.NewToolProvider(ociClient)
-
-	serverVersion := version
-	serverName := "ocireg-mcp"
 
 	// Create the MCP server
 	server := mcpserver.NewMCPServer(serverName, serverVersion)
@@ -83,14 +83,15 @@ func main() {
 	}
 
 	// Create an SSE server
-	sseServer := mcpserver.NewSSEServer(server)
+	return mcpserver.NewSSEServer(server)
+}
 
-	// Channel to receive server errors
+// startServer starts the server and returns a channel for errors
+func startServer(sseServer *mcpserver.SSEServer, port int, serverName, serverVersion string) chan error {
 	serverErrCh := make(chan error, 1)
 
-	// Start the server in a goroutine
 	go func() {
-		addr := fmt.Sprintf(":%d", *port)
+		addr := fmt.Sprintf(":%d", port)
 		log.Printf("Starting %s v%s on %s", serverName, serverVersion, addr)
 		if err := sseServer.Start(addr); err != nil {
 			log.Printf("Server error: %v", err)
@@ -98,14 +99,11 @@ func main() {
 		}
 	}()
 
-	// Wait for either a server error or a shutdown signal
-	select {
-	case err := <-serverErrCh:
-		log.Fatalf("Server failed to start: %v", err)
-	case <-ctx.Done():
-		log.Println("Shutting down server...")
-	}
+	return serverErrCh
+}
 
+// shutdownServer attempts to gracefully shut down the server
+func shutdownServer(sseServer *mcpserver.SSEServer) {
 	// Create a context with a timeout for the graceful shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
@@ -138,5 +136,36 @@ func main() {
 	}
 
 	log.Println("Server shutdown complete, exiting...")
-	os.Exit(0)
+}
+
+func main() {
+	// Parse command-line flags
+	port := flag.Int("port", 8080, "Port to listen on")
+	flag.Parse()
+
+	// Setup context with signal handling for graceful shutdown
+	ctx, cancel := setupContextWithGracefulShutdown()
+	defer cancel()
+
+	// Create the OCI client
+	ociClient := createOCIClient()
+
+	// Server configuration
+	serverName := "ocireg-mcp"
+	serverVersion := version
+
+	// Setup the server
+	sseServer := setupServer(ociClient, serverName, serverVersion)
+
+	// Start the server
+	serverErrCh := startServer(sseServer, *port, serverName, serverVersion)
+
+	// Wait for either a server error or a shutdown signal
+	select {
+	case err := <-serverErrCh:
+		log.Fatalf("Server failed to start: %v", err)
+	case <-ctx.Done():
+		log.Println("Shutting down server...")
+		shutdownServer(sseServer)
+	}
 }
