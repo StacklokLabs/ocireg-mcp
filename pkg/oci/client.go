@@ -4,16 +4,11 @@ package oci
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-)
-
-var (
-	defaultTimeout = 30 * time.Second
 )
 
 // Client provides methods for interacting with OCI registries.
@@ -49,10 +44,7 @@ func (c *Client) GetImage(ctx context.Context, imageRef string) (v1.Image, error
 		return nil, fmt.Errorf("parsing image reference: %w", err)
 	}
 
-	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-
-	options := append(c.options, remote.WithContext(reqCtx))
+	options := append(c.options, remote.WithContext(ctx))
 	img, err := remote.Image(ref, options...)
 	if err != nil {
 		return nil, fmt.Errorf("fetching image: %w", err)
@@ -63,10 +55,7 @@ func (c *Client) GetImage(ctx context.Context, imageRef string) (v1.Image, error
 
 // GetImageManifest retrieves the manifest for an image.
 func (c *Client) GetImageManifest(ctx context.Context, imageRef string) (*v1.Manifest, error) {
-	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-
-	img, err := c.GetImage(reqCtx, imageRef)
+	img, err := c.GetImage(ctx, imageRef)
 	if err != nil {
 		return nil, err
 	}
@@ -81,10 +70,7 @@ func (c *Client) GetImageManifest(ctx context.Context, imageRef string) (*v1.Man
 
 // GetImageConfig retrieves the config for an image.
 func (c *Client) GetImageConfig(ctx context.Context, imageRef string) (*v1.ConfigFile, error) {
-	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-
-	img, err := c.GetImage(reqCtx, imageRef)
+	img, err := c.GetImage(ctx, imageRef)
 	if err != nil {
 		return nil, err
 	}
@@ -104,10 +90,7 @@ func (c *Client) ListTags(ctx context.Context, repoName string) ([]string, error
 		return nil, fmt.Errorf("parsing repository name: %w", err)
 	}
 
-	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
-	defer cancel()
-
-	options := append(c.options, remote.WithContext(reqCtx))
+	options := append(c.options, remote.WithContext(ctx))
 	tags, err := remote.List(repo, options...)
 	if err != nil {
 		return nil, fmt.Errorf("listing tags: %w", err)

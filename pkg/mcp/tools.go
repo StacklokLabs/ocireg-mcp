@@ -5,11 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 
 	"github.com/StacklokLabs/ocireg-mcp/pkg/oci"
 )
+
+// defaultTimeout is the default timeout for OCI registry operations
+const defaultTimeout = 30 * time.Second
 
 // ToolNames defines the names of the tools provided by this MCP server.
 const (
@@ -76,7 +80,11 @@ func (p *ToolProvider) GetImageInfo(ctx context.Context, req mcp.CallToolRequest
 		return mcp.NewToolResultError("image_ref is required"), nil
 	}
 
-	img, err := p.client.GetImage(ctx, imageRef)
+	// Create a context with timeout
+	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	img, err := p.client.GetImage(reqCtx, imageRef)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("failed to get image", err), nil
 	}
@@ -116,7 +124,11 @@ func (p *ToolProvider) ListTags(ctx context.Context, req mcp.CallToolRequest) (*
 		return mcp.NewToolResultError("repository is required"), nil
 	}
 
-	tags, err := p.client.ListTags(ctx, repository)
+	// Create a context with timeout
+	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	tags, err := p.client.ListTags(reqCtx, repository)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("failed to list tags", err), nil
 	}
@@ -140,7 +152,11 @@ func (p *ToolProvider) GetImageManifest(ctx context.Context, req mcp.CallToolReq
 		return mcp.NewToolResultError("image_ref is required"), nil
 	}
 
-	manifest, err := p.client.GetImageManifest(ctx, imageRef)
+	// Create a context with timeout
+	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	manifest, err := p.client.GetImageManifest(reqCtx, imageRef)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("failed to get manifest", err), nil
 	}
@@ -160,7 +176,11 @@ func (p *ToolProvider) GetImageConfig(ctx context.Context, req mcp.CallToolReque
 		return mcp.NewToolResultError("image_ref is required"), nil
 	}
 
-	config, err := p.client.GetImageConfig(ctx, imageRef)
+	// Create a context with timeout
+	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	config, err := p.client.GetImageConfig(reqCtx, imageRef)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("failed to get config", err), nil
 	}
