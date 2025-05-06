@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/go-containerregistry/pkg/v1/remote"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 
 	"github.com/StacklokLabs/ocireg-mcp/pkg/mcp"
@@ -40,8 +41,23 @@ func main() {
 		cancel()
 	}()
 
-	// Create the OCI client
-	ociClient := oci.NewClient()
+	// Create the OCI client with authentication options
+	var ociClientOptions []remote.Option
+
+	// Check for username/password authentication
+	username := os.Getenv("OCI_USERNAME")
+	password := os.Getenv("OCI_PASSWORD")
+	if username != "" && password != "" {
+		log.Println("Using username/password authentication for OCI registry")
+		ociClientOptions = append(ociClientOptions, oci.WithBasicAuth(username, password))
+	} else {
+		// If no explicit credentials, use the default keychain
+		// This will use credentials from the Docker config file
+		log.Println("Using default keychain for OCI registry authentication")
+		ociClientOptions = append(ociClientOptions, oci.WithDefaultKeychain())
+	}
+
+	ociClient := oci.NewClient(ociClientOptions...)
 
 	// Create the tool provider
 	toolProvider := mcp.NewToolProvider(ociClient)

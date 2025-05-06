@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
@@ -25,6 +26,20 @@ func NewClient(options ...remote.Option) *Client {
 	return &Client{
 		options: options,
 	}
+}
+
+// WithBasicAuth returns a remote.Option for basic authentication with username and password.
+func WithBasicAuth(username, password string) remote.Option {
+	return remote.WithAuth(&authn.Basic{
+		Username: username,
+		Password: password,
+	})
+}
+
+// WithDefaultKeychain returns a remote.Option that uses the default keychain for authentication.
+// The default keychain reads credentials from the Docker config file (~/.docker/config.json).
+func WithDefaultKeychain() remote.Option {
+	return remote.WithAuthFromKeychain(authn.DefaultKeychain)
 }
 
 // GetImage retrieves an image from a registry.

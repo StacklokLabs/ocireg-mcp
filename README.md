@@ -64,6 +64,22 @@ Get the config for an OCI image.
 - Go 1.21 or later
 - Access to OCI registries
 
+### Authentication
+
+The server supports the following authentication methods for accessing private OCI registries:
+
+1. **Username and Password**: Set the following environment variables:
+   - `OCI_USERNAME`: Username for registry authentication
+   - `OCI_PASSWORD`: Password for registry authentication
+
+2. **Docker Config**: If no username/password is provided, the server will use the default Docker keychain, which reads credentials from `~/.docker/config.json`.
+
+Example:
+```bash
+export OCI_USERNAME=myuser
+export OCI_PASSWORD=mypassword
+```
+
 ### Testing
 
 ```bash
