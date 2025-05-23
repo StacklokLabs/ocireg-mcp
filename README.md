@@ -87,6 +87,20 @@ export OCI_USERNAME=myuser
 export OCI_PASSWORD=mypassword
 ```
 
+### Port Configuration
+
+The server can be configured to listen on a specific port using either:
+
+1. **Environment Variable**:
+   - `MCP_PORT`: The port number to listen on (must be between 0 and 65535)
+   - If not set or invalid, defaults to port 8080
+
+2. **Command-line Flag**:
+   - `-port`: Overrides the environment variable setting (must be between 0 and 65535)
+   - If invalid port provided it defaults to port 8080
+   - Example: `./ocireg-mcp -port 9090`
+
+
 ### Testing
 
 ```bash
@@ -111,3 +125,4 @@ repository or join us in the `#mcp-servers` channel on our
 ## License
 
 This project is licensed under the Apache v2 License - see the LICENSE file for details.
+
