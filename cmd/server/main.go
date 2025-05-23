@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -144,10 +145,50 @@ func shutdownServer(sseServer *mcpserver.SSEServer) {
 	log.Println("Server shutdown complete, exiting...")
 }
 
+// validatePort checks if the given port number is valid (between 0 and 65535).
+// Returns true if valid, false otherwise.
+func validatePort(port int) bool {
+	return port >= 0 && port <= 65535
+}
+
+// getMCPServerPort returns the port number from MCP_PORT environment variable.
+// If the environment variable is not set or contains an invalid value,
+// it returns the default port 8080.
+func getMCPServerPort() int {
+	const defaultPort = 8080
+
+	envPort := os.Getenv("MCP_PORT")
+	if envPort == "" {
+		return defaultPort
+	}
+
+	port, err := strconv.Atoi(envPort)
+	if err != nil {
+		log.Printf("Invalid MCP_PORT value: %s (must be a valid number), using default port 8080", envPort)
+		return defaultPort
+	}
+
+	if !validatePort(port) {
+		log.Printf("Invalid MCP_PORT value: %s (must be between 0 and 65535), using default port 8080", envPort)
+		return defaultPort
+	}
+
+	return port
+}
+
 func main() {
+	// Get port from environment variable or use default
+	envPort := getMCPServerPort()
+
 	// Parse command-line flags
-	port := flag.Int("port", 8080, "Port to listen on")
+	port := flag.Int("port", envPort, "Port to listen on (must be between 0 and 65535)")
 	flag.Parse()
+
+	// Validate command-line port
+	if !validatePort(*port) {
+		log.Printf("Invalid port number: %d (must be between 0 and 65535), using default port 8080", *port)
+		*port = 8080
+	}
 
 	// Setup context with signal handling for graceful shutdown
 	ctx, cancel := setupContextWithGracefulShutdown()
