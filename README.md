@@ -57,6 +57,50 @@ Get the config for an OCI image.
 **Output:**
 - The image config
 
+## Usage
+
+### Running with ToolHive (Recommended)
+
+The easiest way to run the OCI Registry MCP server is using [ToolHive](https://github.com/stacklok/toolhive), which provides secure, containerized deployment of MCP servers:
+
+```bash
+# Install ToolHive (if not already installed)
+# See: https://github.com/stacklok/toolhive#installation
+
+# Enable auto-discovery to automatically configure supported clients
+thv config auto-discovery true
+
+# Run the OCI Registry MCP server (packaged as 'oci-registry' in ToolHive)
+thv run oci-registry
+
+# List running servers
+thv list
+
+# Get detailed information about the server
+thv registry info oci-registry
+```
+
+The server will be available to your MCP-compatible clients and can query OCI registries for image information.
+
+#### Authentication with ToolHive
+
+If you need to access private registries, you can provide authentication credentials using ToolHive's secret management:
+
+```bash
+# For bearer token authentication
+thv secret set oci-token
+# Enter your bearer token when prompted
+
+thv run --secret oci-token,target=OCI_TOKEN oci-registry
+
+# For username/password authentication
+thv secret set oci-username
+thv secret set oci-password
+# Enter your credentials when prompted
+
+thv run --secret oci-username,target=OCI_USERNAME --secret oci-password,target=OCI_PASSWORD oci-registry
+```
+
 ## Development
 
 ### Prerequisites
