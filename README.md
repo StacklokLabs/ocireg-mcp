@@ -1,10 +1,13 @@
 # OCI Registry MCP Server
 
-An MCP (Model Context Protocol) server that provides tools for querying OCI registries and image references.
+An MCP (Model Context Protocol) server that provides tools for querying OCI
+registries and image references.
 
 ## Overview
 
-This project implements an SSE-based MCP server that allows LLM-powered applications to interact with OCI registries. It provides tools for retrieving information about container images, listing tags, and more.
+This project implements an SSE-based MCP server that allows LLM-powered
+applications to interact with OCI registries. It provides tools for retrieving
+information about container images, listing tags, and more.
 
 ## Features
 
@@ -22,19 +25,24 @@ The server provides the following MCP tools:
 Get information about an OCI image.
 
 **Input:**
+
 - `image_ref`: The image reference (e.g., docker.io/library/alpine:latest)
 
 **Output:**
-- Image information including digest, size, architecture, OS, creation date, and number of layers
+
+- Image information including digest, size, architecture, OS, creation date, and
+  number of layers
 
 ### list_tags
 
 List tags for a repository.
 
 **Input:**
+
 - `repository`: The repository name (e.g., docker.io/library/alpine)
 
 **Output:**
+
 - List of tags for the repository
 
 ### get_image_manifest
@@ -42,9 +50,11 @@ List tags for a repository.
 Get the manifest for an OCI image.
 
 **Input:**
+
 - `image_ref`: The image reference (e.g., docker.io/library/alpine:latest)
 
 **Output:**
+
 - The image manifest
 
 ### get_image_config
@@ -52,24 +62,27 @@ Get the manifest for an OCI image.
 Get the config for an OCI image.
 
 **Input:**
+
 - `image_ref`: The image reference (e.g., docker.io/library/alpine:latest)
 
 **Output:**
+
 - The image config
 
 ## Usage
 
 ### Running with ToolHive (Recommended)
 
-The easiest way to run the OCI Registry MCP server is using [ToolHive](https://github.com/stacklok/toolhive), which provides secure, containerized deployment of MCP servers:
+The easiest way to run the OCI Registry MCP server is using
+[ToolHive](https://github.com/stacklok/toolhive), which provides secure,
+containerized deployment of MCP servers:
 
 ```bash
 # Install ToolHive (if not already installed)
-# See: https://github.com/stacklok/toolhive#installation
+# See: https://docs.stacklok.com/toolhive/guides-cli/install
 
-# Enable auto-discovery to automatically configure supported clients
-thv config auto-discovery true
-
+# Register a supported client so ToolHive can auto-configure your environment
+thv client setup
 # Run the OCI Registry MCP server (packaged as 'oci-registry' in ToolHive)
 thv run oci-registry
 
@@ -80,11 +93,13 @@ thv list
 thv registry info oci-registry
 ```
 
-The server will be available to your MCP-compatible clients and can query OCI registries for image information.
+The server will be available to your MCP-compatible clients and can query OCI
+registries for image information.
 
 #### Authentication with ToolHive
 
-If you need to access private registries, you can provide authentication credentials using ToolHive's secret management:
+If you need to access private registries, you can provide authentication
+credentials using ToolHive's secret management:
 
 ```bash
 # For bearer token authentication
@@ -110,18 +125,24 @@ thv run --secret oci-username,target=OCI_USERNAME --secret oci-password,target=O
 
 ### Authentication
 
-The server supports the following authentication methods for accessing private OCI registries:
+The server supports the following authentication methods for accessing private
+OCI registries:
 
 1. **Bearer Token**: Set the following environment variable:
+
    - `OCI_TOKEN`: Bearer token for registry authentication
 
 2. **Username and Password**: Set the following environment variables:
+
    - `OCI_USERNAME`: Username for registry authentication
    - `OCI_PASSWORD`: Password for registry authentication
 
-3. **Docker Config**: If no token or username/password is provided, the server will use the default Docker keychain, which reads credentials from `~/.docker/config.json`.
+3. **Docker Config**: If no token or username/password is provided, the server
+   will use the default Docker keychain, which reads credentials from
+   `~/.docker/config.json`.
 
 Examples:
+
 ```bash
 # Bearer token authentication
 export OCI_TOKEN=mytoken
@@ -136,14 +157,15 @@ export OCI_PASSWORD=mypassword
 The server can be configured to listen on a specific port using either:
 
 1. **Environment Variable**:
+
    - `MCP_PORT`: The port number to listen on (must be between 0 and 65535)
    - If not set or invalid, defaults to port 8080
 
 2. **Command-line Flag**:
-   - `-port`: Overrides the environment variable setting (must be between 0 and 65535)
+   - `-port`: Overrides the environment variable setting (must be between 0
+     and 65535)
    - If invalid port provided it defaults to port 8080
    - Example: `./ocireg-mcp -port 9090`
-
 
 ### Testing
 
@@ -155,11 +177,13 @@ go test ./...
 
 ```bash
 golangci-lint run
+```
 
 ## Contributing
 
-We welcome contributions to this MCP server! If you'd like to contribute, please review
-the [CONTRIBUTING guide](./CONTRIBUTING.md) for details on how to get started.
+We welcome contributions to this MCP server! If you'd like to contribute, please
+review the [CONTRIBUTING guide](./CONTRIBUTING.md) for details on how to get
+started.
 
 If you run into a bug or have a feature request, please
 [open an issue](https://github.com/StacklokLabs/ocireg-mcp/issues) in the
@@ -168,5 +192,5 @@ repository or join us in the `#mcp-servers` channel on our
 
 ## License
 
-This project is licensed under the Apache v2 License - see the LICENSE file for details.
-
+This project is licensed under the Apache v2 License - see the LICENSE file for
+details.
