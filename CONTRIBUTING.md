@@ -1,9 +1,10 @@
-# Contributing to ocireg-mcp <!-- omit from toc -->
+# Contributing to `ocireg-mcp` <!-- omit from toc -->
 
-First off, thank you for taking the time to contribute to ocireg-mcp! :+1: :tada:
-ocireg-mcp is released under the MIT license. If you would like to
+First off, thank you for taking the time to contribute to ocireg-mcp! :+1:
+:tada: ocireg-mcp is released under the Apache 2.0 license. If you would like to
 contribute something or want to hack on the code, this document should help you
-get started.
+get started. You can find some hints for starting development in ocireg-mcp's
+[README](https://github.com/StacklokLabs/ocireg-mcp/blob/main/README.md).
 
 ## Table of contents <!-- omit from toc -->
 
@@ -13,7 +14,6 @@ get started.
   - [Using GitHub Issues](#using-github-issues)
   - [Not sure how to start contributing?](#not-sure-how-to-start-contributing)
   - [Pull request process](#pull-request-process)
-  - [Contributing to docs](#contributing-to-docs)
   - [Commit message guidelines](#commit-message-guidelines)
 
 ## Code of conduct
@@ -36,8 +36,8 @@ security vulnerabilities using GitHub issues; instead, please follow this
 ### Using GitHub Issues
 
 We use GitHub issues to track bugs and enhancements. If you have a general usage
-question, please ask in
-[ocireg-mcp's discussion forum](https://discord.gg/stacklok).
+question, please ask in the #mcp-servers channel of the
+[Stacklok Discord server](https://discord.gg/stacklok).
 
 If you are reporting a bug, please help to speed up problem diagnosis by
 providing as much information as possible. Ideally, that would include a small
@@ -50,10 +50,14 @@ PRs to resolve existing issues are greatly appreciated and issues labeled as
 are a great place to start!
 
 ### Pull request process
--All commits must include a Signed-off-by trailer at the end of each commit message to indicate that the contributor agrees to the Developer Certificate of Origin. For additional details, check out the [DCO instructions](dco.md).
+
+-All commits must include a Signed-off-by trailer at the end of each commit
+message to indicate that the contributor agrees to the Developer Certificate of
+Origin. For additional details, check out the [DCO instructions](dco.md).
 
 - Create an issue outlining the fix or feature.
-- Fork the ocireg-mcp repository to your own GitHub account and clone it locally.
+- Fork the ocireg-mcp repository to your own GitHub account and clone it
+  locally.
 - Hack on your changes.
 - Correctly format your commit messages, see
   [Commit message guidelines](#commit-message-guidelines) below.
@@ -64,10 +68,6 @@ are a great place to start!
   merging.
 - Once approved, all of your commits will be squashed into a single commit with
   your PR title.
-
-### Contributing to docs
-
-TBD
 
 ### Commit message guidelines
 
