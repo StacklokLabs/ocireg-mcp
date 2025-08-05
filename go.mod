@@ -4,7 +4,7 @@ go 1.24.2
 
 require (
 	github.com/google/go-containerregistry v0.20.6
-	github.com/mark3labs/mcp-go v0.36.0
+	github.com/mark3labs/mcp-go v0.37.0
 	github.com/stretchr/testify v1.10.0
 )
 
