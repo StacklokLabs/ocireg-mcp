@@ -1,5 +1,6 @@
 # OCI Registry MCP Server
 
+[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/StacklokLabs/ocireg-mcp)](https://archestra.ai/mcp-catalog/stackloklabs__ocireg-mcp)
 An MCP (Model Context Protocol) server that provides tools for querying OCI
 registries and image references.
 
