@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -23,9 +24,13 @@ const (
 	GetImageConfigToolName   = "get_image_config"
 )
 
+// ClientFactory is a function that creates an OCI client from HTTP headers
+type ClientFactory func(http.Header) *oci.Client
+
 // ToolProvider provides MCP tools for OCI registry operations.
 type ToolProvider struct {
-	client *oci.Client
+	client        *oci.Client
+	clientFactory ClientFactory
 }
 
 // NewToolProvider creates a new ToolProvider.
@@ -33,6 +38,24 @@ func NewToolProvider(client *oci.Client) *ToolProvider {
 	return &ToolProvider{
 		client: client,
 	}
+}
+
+// NewToolProviderWithFactory creates a new ToolProvider with a custom client factory.
+// The factory will be used to create clients per-request based on HTTP headers.
+func NewToolProviderWithFactory(clientFactory ClientFactory) *ToolProvider {
+	return &ToolProvider{
+		clientFactory: clientFactory,
+	}
+}
+
+// getClient returns the appropriate OCI client for the request.
+// If a client factory is configured, it creates a new client from the request headers.
+// Otherwise, it uses the default client.
+func (p *ToolProvider) getClient(req mcp.CallToolRequest) *oci.Client {
+	if p.clientFactory != nil {
+		return p.clientFactory(req.Header)
+	}
+	return p.client
 }
 
 // GetTools returns the list of tools provided by this MCP server.
@@ -80,11 +103,14 @@ func (p *ToolProvider) GetImageInfo(_ context.Context, req mcp.CallToolRequest) 
 		return mcp.NewToolResultError("image_ref is required"), nil
 	}
 
+	// Get the appropriate client for this request
+	client := p.getClient(req)
+
 	// Create a context with timeout
 	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
-	img, err := p.client.GetImage(reqCtx, imageRef)
+	img, err := client.GetImage(reqCtx, imageRef)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("failed to get image", err), nil
 	}
@@ -124,11 +150,14 @@ func (p *ToolProvider) ListTags(_ context.Context, req mcp.CallToolRequest) (*mc
 		return mcp.NewToolResultError("repository is required"), nil
 	}
 
+	// Get the appropriate client for this request
+	client := p.getClient(req)
+
 	// Create a context with timeout
 	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
-	tags, err := p.client.ListTags(reqCtx, repository)
+	tags, err := client.ListTags(reqCtx, repository)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("failed to list tags", err), nil
 	}
@@ -152,11 +181,14 @@ func (p *ToolProvider) GetImageManifest(_ context.Context, req mcp.CallToolReque
 		return mcp.NewToolResultError("image_ref is required"), nil
 	}
 
+	// Get the appropriate client for this request
+	client := p.getClient(req)
+
 	// Create a context with timeout
 	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
-	manifest, err := p.client.GetImageManifest(reqCtx, imageRef)
+	manifest, err := client.GetImageManifest(reqCtx, imageRef)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("failed to get manifest", err), nil
 	}
@@ -176,11 +208,14 @@ func (p *ToolProvider) GetImageConfig(_ context.Context, req mcp.CallToolRequest
 		return mcp.NewToolResultError("image_ref is required"), nil
 	}
 
+	// Get the appropriate client for this request
+	client := p.getClient(req)
+
 	// Create a context with timeout
 	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
-	config, err := p.client.GetImageConfig(reqCtx, imageRef)
+	config, err := client.GetImageConfig(reqCtx, imageRef)
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("failed to get config", err), nil
 	}
