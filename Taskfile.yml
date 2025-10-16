@@ -52,3 +52,21 @@ tasks:
     desc: Install dependencies
     cmds:
       - go mod download
+
+  docker-build:
+    desc: Build container image locally using ko
+    cmds:
+      - ko build --local --base-import-paths {{.MAIN_PACKAGE}}
+    env:
+      KO_DOCKER_REPO: '{{.KO_DOCKER_REPO | default "ko.local/ocireg-mcp"}}'
+      VERSION: '{{.VERSION | default "dev"}}'
+      CREATION_TIME: '{{now | date "2006-01-02T15:04:05Z07:00"}}'
+
+  docker-build-multiarch:
+    desc: Build multi-architecture container image using ko
+    cmds:
+      - ko build --local --platform=linux/amd64,linux/arm64 --base-import-paths {{.MAIN_PACKAGE}}
+    env:
+      KO_DOCKER_REPO: '{{.KO_DOCKER_REPO | default "ko.local/ocireg-mcp"}}'
+      VERSION: '{{.VERSION | default "dev"}}'
+      CREATION_TIME: '{{now | date "2006-01-02T15:04:05Z07:00"}}'
