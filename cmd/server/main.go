@@ -6,9 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -41,26 +43,39 @@ func setupContextWithGracefulShutdown() (context.Context, context.CancelFunc) {
 	return ctx, cancel
 }
 
-// createOCIClient creates an OCI client with appropriate authentication
-func createOCIClient() *oci.Client {
+// createOCIClientFromHeaders creates an OCI client using authentication from HTTP headers
+// Priority: Authorization header > OCI_TOKEN env > OCI_USERNAME/PASSWORD env > default keychain
+func createOCIClientFromHeaders(headers http.Header) *oci.Client {
 	var ociClientOptions []remote.Option
 
-	// Check for authentication method based on available environment variables
+	// Priority 1: Check for bearer token from HTTP Authorization header (highest priority)
+	authHeader := headers.Get("Authorization")
+	if authHeader != "" {
+		const bearerPrefix = "Bearer "
+		if strings.HasPrefix(authHeader, bearerPrefix) {
+			token := strings.TrimPrefix(authHeader, bearerPrefix)
+			log.Println("Authentication: Using bearer token from Authorization header")
+			ociClientOptions = append(ociClientOptions, oci.WithBearerToken(token))
+			return oci.NewClient(ociClientOptions...)
+		}
+	}
+
+	// Priority 2: Check for authentication from environment variables
 	token := os.Getenv("OCI_TOKEN")
 	username := os.Getenv("OCI_USERNAME")
 	password := os.Getenv("OCI_PASSWORD")
 
 	switch {
 	case token != "":
-		log.Println("Using bearer token authentication for OCI registry")
+		log.Println("Authentication: Using bearer token from OCI_TOKEN environment variable")
 		ociClientOptions = append(ociClientOptions, oci.WithBearerToken(token))
 	case username != "" && password != "":
-		log.Println("Using username/password authentication for OCI registry")
+		log.Println("Authentication: Using username/password from environment variables")
 		ociClientOptions = append(ociClientOptions, oci.WithBasicAuth(username, password))
 	default:
-		// If no explicit credentials, use the default keychain
+		// Priority 3: If no explicit credentials, use the default keychain
 		// This will use credentials from the Docker config file
-		log.Println("Using default keychain for OCI registry authentication")
+		log.Println("Authentication: Using default keychain (Docker config)")
 		ociClientOptions = append(ociClientOptions, oci.WithDefaultKeychain())
 	}
 
@@ -68,9 +83,9 @@ func createOCIClient() *oci.Client {
 }
 
 // setupServer creates and configures the MCP server with tools
-func setupServer(ociClient *oci.Client, serverName, serverVersion string) *mcpserver.SSEServer {
-	// Create the tool provider
-	toolProvider := mcp.NewToolProvider(ociClient)
+func setupServer(serverName, serverVersion string) *mcpserver.SSEServer {
+	// Create the tool provider with a factory that creates clients per-request
+	toolProvider := mcp.NewToolProviderWithFactory(createOCIClientFromHeaders)
 
 	// Create the MCP server
 	server := mcpserver.NewMCPServer(serverName, serverVersion)
@@ -194,15 +209,12 @@ func main() {
 	ctx, cancel := setupContextWithGracefulShutdown()
 	defer cancel()
 
-	// Create the OCI client
-	ociClient := createOCIClient()
-
 	// Server configuration
 	serverName := "ocireg-mcp"
 	serverVersion := version
 
 	// Setup the server
-	sseServer := setupServer(ociClient, serverName, serverVersion)
+	sseServer := setupServer(serverName, serverVersion)
 
 	// Start the server
 	serverErrCh := startServer(sseServer, *port, serverName, serverVersion)

@@ -127,28 +127,39 @@ thv run --secret oci-username,target=OCI_USERNAME --secret oci-password,target=O
 ### Authentication
 
 The server supports the following authentication methods for accessing private
-OCI registries:
+OCI registries (in order of priority):
 
-1. **Bearer Token**: Set the following environment variable:
+1. **HTTP Authorization Header** (Highest Priority): Include a bearer token in
+   the HTTP request's `Authorization` header:
+
+   - `Authorization: Bearer <your-token>`
+   - This method takes precedence over all other authentication methods
+   - When present, environment variables and Docker config are ignored
+
+2. **Bearer Token Environment Variable**: Set the following environment variable:
 
    - `OCI_TOKEN`: Bearer token for registry authentication
 
-2. **Username and Password**: Set the following environment variables:
+3. **Username and Password**: Set the following environment variables:
 
    - `OCI_USERNAME`: Username for registry authentication
    - `OCI_PASSWORD`: Password for registry authentication
 
-3. **Docker Config**: If no token or username/password is provided, the server
-   will use the default Docker keychain, which reads credentials from
+4. **Docker Config** (Lowest Priority): If no other authentication is provided,
+   the server will use the default Docker keychain, which reads credentials from
    `~/.docker/config.json`.
 
 Examples:
 
 ```bash
-# Bearer token authentication
+# HTTP Authorization header (for per-request authentication)
+# This is handled automatically by the MCP client when making requests
+# Example: curl -H "Authorization: Bearer mytoken" http://localhost:8080/...
+
+# Bearer token authentication via environment variable
 export OCI_TOKEN=mytoken
 
-# Username/password authentication
+# Username/password authentication via environment variables
 export OCI_USERNAME=myuser
 export OCI_PASSWORD=mypassword
 ```
