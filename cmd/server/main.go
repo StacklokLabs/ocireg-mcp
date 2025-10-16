@@ -54,7 +54,7 @@ func createOCIClientFromHeaders(headers http.Header) *oci.Client {
 		const bearerPrefix = "Bearer "
 		if strings.HasPrefix(authHeader, bearerPrefix) {
 			token := strings.TrimPrefix(authHeader, bearerPrefix)
-			log.Println("Using bearer token from Authorization header for OCI registry")
+			log.Println("Authentication: Using bearer token from Authorization header")
 			ociClientOptions = append(ociClientOptions, oci.WithBearerToken(token))
 			return oci.NewClient(ociClientOptions...)
 		}
@@ -67,15 +67,15 @@ func createOCIClientFromHeaders(headers http.Header) *oci.Client {
 
 	switch {
 	case token != "":
-		log.Println("Using bearer token from OCI_TOKEN environment variable for OCI registry")
+		log.Println("Authentication: Using bearer token from OCI_TOKEN environment variable")
 		ociClientOptions = append(ociClientOptions, oci.WithBearerToken(token))
 	case username != "" && password != "":
-		log.Println("Using username/password authentication for OCI registry")
+		log.Println("Authentication: Using username/password from environment variables")
 		ociClientOptions = append(ociClientOptions, oci.WithBasicAuth(username, password))
 	default:
 		// Priority 3: If no explicit credentials, use the default keychain
 		// This will use credentials from the Docker config file
-		log.Println("Using default keychain for OCI registry authentication")
+		log.Println("Authentication: Using default keychain (Docker config)")
 		ociClientOptions = append(ociClientOptions, oci.WithDefaultKeychain())
 	}
 

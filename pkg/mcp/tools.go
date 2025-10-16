@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -98,6 +99,7 @@ func (*ToolProvider) GetTools() []mcp.Tool {
 
 // GetImageInfo handles the get_image_info tool.
 func (p *ToolProvider) GetImageInfo(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	log.Printf("Tool called: get_image_info")
 	imageRef := mcp.ParseString(req, "image_ref", "")
 	if imageRef == "" {
 		return mcp.NewToolResultError("image_ref is required"), nil
@@ -145,6 +147,7 @@ func (p *ToolProvider) GetImageInfo(_ context.Context, req mcp.CallToolRequest) 
 
 // ListTags handles the list_tags tool.
 func (p *ToolProvider) ListTags(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	log.Printf("Tool called: list_tags")
 	repository := mcp.ParseString(req, "repository", "")
 	if repository == "" {
 		return mcp.NewToolResultError("repository is required"), nil
@@ -176,6 +179,7 @@ func (p *ToolProvider) ListTags(_ context.Context, req mcp.CallToolRequest) (*mc
 
 // GetImageManifest handles the get_image_manifest tool.
 func (p *ToolProvider) GetImageManifest(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	log.Printf("Tool called: get_image_manifest")
 	imageRef := mcp.ParseString(req, "image_ref", "")
 	if imageRef == "" {
 		return mcp.NewToolResultError("image_ref is required"), nil
@@ -203,6 +207,7 @@ func (p *ToolProvider) GetImageManifest(_ context.Context, req mcp.CallToolReque
 
 // GetImageConfig handles the get_image_config tool.
 func (p *ToolProvider) GetImageConfig(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	log.Printf("Tool called: get_image_config")
 	imageRef := mcp.ParseString(req, "image_ref", "")
 	if imageRef == "" {
 		return mcp.NewToolResultError("image_ref is required"), nil
