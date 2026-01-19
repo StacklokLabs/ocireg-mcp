@@ -21,6 +21,12 @@ import (
 	"github.com/StacklokLabs/ocireg-mcp/pkg/oci"
 )
 
+const (
+	// Transport types
+	transportSSE            = "sse"
+	transportStreamableHTTP = "streamable-http"
+)
+
 var (
 	// version is set during build using ldflags
 	version = "dev"
@@ -83,7 +89,7 @@ func createOCIClientFromHeaders(headers http.Header) *oci.Client {
 }
 
 // setupServer creates and configures the MCP server with tools
-func setupServer(serverName, serverVersion string) *mcpserver.SSEServer {
+func setupServer(serverName, serverVersion string) *mcpserver.MCPServer {
 	// Create the tool provider with a factory that creates clients per-request
 	toolProvider := mcp.NewToolProviderWithFactory(createOCIClientFromHeaders)
 
@@ -104,18 +110,23 @@ func setupServer(serverName, serverVersion string) *mcpserver.SSEServer {
 		}
 	}
 
-	// Create an SSE server
-	return mcpserver.NewSSEServer(server)
+	return server
+}
+
+// transportServer is an interface for MCP transport servers
+type transportServer interface {
+	Start(string) error
+	Shutdown(context.Context) error
 }
 
 // startServer starts the server and returns a channel for errors
-func startServer(sseServer *mcpserver.SSEServer, port int, serverName, serverVersion string) chan error {
+func startServer(server transportServer, port int, serverName, serverVersion, transport string) chan error {
 	serverErrCh := make(chan error, 1)
 
 	go func() {
 		addr := fmt.Sprintf(":%d", port)
-		log.Printf("Starting %s v%s on %s", serverName, serverVersion, addr)
-		if err := sseServer.Start(addr); err != nil {
+		log.Printf("Starting %s v%s on %s (%s transport)", serverName, serverVersion, addr, transport)
+		if err := server.Start(addr); err != nil {
 			log.Printf("Server error: %v", err)
 			serverErrCh <- err
 		}
@@ -125,7 +136,7 @@ func startServer(sseServer *mcpserver.SSEServer, port int, serverName, serverVer
 }
 
 // shutdownServer attempts to gracefully shut down the server
-func shutdownServer(sseServer *mcpserver.SSEServer) {
+func shutdownServer(server transportServer) {
 	// Create a context with a timeout for the graceful shutdown
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
@@ -134,7 +145,7 @@ func shutdownServer(sseServer *mcpserver.SSEServer) {
 	shutdownCh := make(chan error, 1)
 	go func() {
 		log.Println("Initiating server shutdown...")
-		err := sseServer.Shutdown(shutdownCtx)
+		err := server.Shutdown(shutdownCtx)
 		if err != nil {
 			log.Printf("Error during shutdown: %v", err)
 		}
@@ -191,12 +202,38 @@ func getMCPServerPort() int {
 	return port
 }
 
+// getDefaultTransport returns the transport to use based on MCP_TRANSPORT environment variable.
+// If the environment variable is not set, returns "streamable-http".
+// Valid values are "sse" and "streamable-http".
+func getDefaultTransport() string {
+	defaultTransport := transportStreamableHTTP
+
+	transportEnv := os.Getenv("MCP_TRANSPORT")
+	if transportEnv == "" {
+		return defaultTransport
+	}
+
+	// Normalize the transport value
+	transport := strings.ToLower(strings.TrimSpace(transportEnv))
+
+	// Validate the transport value
+	if transport != transportSSE && transport != transportStreamableHTTP {
+		log.Printf("Invalid MCP_TRANSPORT: %s, using default: %s",
+			transportEnv, defaultTransport)
+		return defaultTransport
+	}
+
+	return transport
+}
+
 func main() {
 	// Get port from environment variable or use default
 	envPort := getMCPServerPort()
 
 	// Parse command-line flags
 	port := flag.Int("port", envPort, "Port to listen on (must be between 0 and 65535)")
+	transport := flag.String("transport", getDefaultTransport(),
+		"Transport protocol: 'sse' or 'streamable-http'. Also via MCP_TRANSPORT env var")
 	flag.Parse()
 
 	// Validate command-line port
@@ -213,11 +250,24 @@ func main() {
 	serverName := "ocireg-mcp"
 	serverVersion := version
 
-	// Setup the server
-	sseServer := setupServer(serverName, serverVersion)
+	// Setup the MCP server
+	mcpServer := setupServer(serverName, serverVersion)
+
+	// Create the appropriate transport server
+	var server transportServer
+	switch strings.ToLower(*transport) {
+	case transportStreamableHTTP:
+		log.Println("Using streamable-http transport")
+		server = mcpserver.NewStreamableHTTPServer(mcpServer)
+	case transportSSE:
+		log.Println("Using SSE transport")
+		server = mcpserver.NewSSEServer(mcpServer)
+	default:
+		log.Fatalf("Invalid transport: %s. Must be 'sse' or 'streamable-http'", *transport)
+	}
 
 	// Start the server
-	serverErrCh := startServer(sseServer, *port, serverName, serverVersion)
+	serverErrCh := startServer(server, *port, serverName, serverVersion, *transport)
 
 	// Wait for either a server error or a shutdown signal
 	select {
@@ -225,6 +275,6 @@ func main() {
 		log.Fatalf("Server failed to start: %v", err)
 	case <-ctx.Done():
 		log.Println("Shutting down server...")
-		shutdownServer(sseServer)
+		shutdownServer(server)
 	}
 }
