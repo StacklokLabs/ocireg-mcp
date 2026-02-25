@@ -68,14 +68,30 @@ func (*ToolProvider) GetTools() []mcp.Tool {
 				mcp.Description("The image reference (e.g., docker.io/library/alpine:latest)"),
 				mcp.Required(),
 			),
+			mcp.WithOutputSchema[ImageInfoResult](),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		mcp.NewTool(
 			ListTagsToolName,
-			mcp.WithDescription("List tags for a repository"),
+			mcp.WithDescription("List tags for a repository with pagination support"),
 			mcp.WithString("repository",
 				mcp.Description("The repository name (e.g., docker.io/library/alpine)"),
 				mcp.Required(),
 			),
+			mcp.WithNumber("limit",
+				mcp.Description("Maximum number of tags to return per page (default: 100, max: 1000)"),
+			),
+			mcp.WithString("cursor",
+				mcp.Description("Opaque pagination cursor from a previous list_tags response"),
+			),
+			mcp.WithString("sort",
+				mcp.Description("Sort order for tags"),
+				mcp.Enum("alphabetical", "alphabetical-desc", "semver", "semver-desc"),
+			),
+			mcp.WithOutputSchema[ListTagsResult](),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		mcp.NewTool(
 			GetImageManifestToolName,
@@ -84,6 +100,8 @@ func (*ToolProvider) GetTools() []mcp.Tool {
 				mcp.Description("The image reference (e.g., docker.io/library/alpine:latest)"),
 				mcp.Required(),
 			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		mcp.NewTool(
 			GetImageConfigToolName,
@@ -92,12 +110,14 @@ func (*ToolProvider) GetTools() []mcp.Tool {
 				mcp.Description("The image reference (e.g., docker.io/library/alpine:latest)"),
 				mcp.Required(),
 			),
+			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithOpenWorldHintAnnotation(true),
 		),
 	}
 }
 
 // GetImageInfo handles the get_image_info tool.
-func (p *ToolProvider) GetImageInfo(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (p *ToolProvider) GetImageInfo(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	imageRef := mcp.ParseString(req, "image_ref", "")
 	if imageRef == "" {
 		return mcp.NewToolResultError("image_ref is required"), nil
@@ -107,7 +127,7 @@ func (p *ToolProvider) GetImageInfo(_ context.Context, req mcp.CallToolRequest) 
 	client := p.getClient(req)
 
 	// Create a context with timeout
-	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	reqCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
 	img, err := client.GetImage(reqCtx, imageRef)
@@ -125,14 +145,13 @@ func (p *ToolProvider) GetImageInfo(_ context.Context, req mcp.CallToolRequest) 
 		return mcp.NewToolResultErrorFromErr("failed to get config", err), nil
 	}
 
-	// Prepare the result
-	result := map[string]interface{}{
-		"digest":       manifest.Config.Digest.String(),
-		"size":         manifest.Config.Size,
-		"architecture": config.Architecture,
-		"os":           config.OS,
-		"created":      config.Created.Format("2006-01-02T15:04:05Z07:00"),
-		"layers":       len(manifest.Layers),
+	result := ImageInfoResult{
+		Digest:       manifest.Config.Digest.String(),
+		Size:         manifest.Config.Size,
+		Architecture: config.Architecture,
+		OS:           config.OS,
+		Created:      config.Created.Format("2006-01-02T15:04:05Z07:00"),
+		Layers:       len(manifest.Layers),
 	}
 
 	resultJSON, err := json.MarshalIndent(result, "", "  ")
@@ -140,21 +159,57 @@ func (p *ToolProvider) GetImageInfo(_ context.Context, req mcp.CallToolRequest) 
 		return mcp.NewToolResultErrorFromErr("failed to marshal result", err), nil
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf("Image information for %s:\n\n```json\n%s\n```", imageRef, string(resultJSON))), nil
+	fallback := fmt.Sprintf("Image information for %s:\n\n```json\n%s\n```", imageRef, string(resultJSON))
+	return mcp.NewToolResultStructured(result, fallback), nil
 }
 
 // ListTags handles the list_tags tool.
-func (p *ToolProvider) ListTags(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (p *ToolProvider) ListTags(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	repository := mcp.ParseString(req, "repository", "")
 	if repository == "" {
 		return mcp.NewToolResultError("repository is required"), nil
+	}
+
+	// Parse and clamp limit
+	limit := mcp.ParseInt(req, "limit", DefaultPageSize)
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > MaxPageSize {
+		limit = MaxPageSize
+	}
+
+	// Parse sort order
+	sortOrder := mcp.ParseString(req, "sort", SortAlphabetical)
+	if !isValidSortOrder(sortOrder) {
+		return mcp.NewToolResultError(fmt.Sprintf(
+			"invalid sort order %q: must be one of alphabetical, alphabetical-desc, semver, semver-desc",
+			sortOrder,
+		)), nil
+	}
+
+	// Parse cursor
+	var offset int
+	cursorStr := mcp.ParseString(req, "cursor", "")
+	if cursorStr != "" {
+		cursor, err := decodeCursor(cursorStr)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("invalid cursor: %v", err)), nil
+		}
+		if cursor.Sort != sortOrder {
+			return mcp.NewToolResultError(fmt.Sprintf(
+				"sort order mismatch: cursor was created with %q but request specifies %q",
+				cursor.Sort, sortOrder,
+			)), nil
+		}
+		offset = cursor.Offset
 	}
 
 	// Get the appropriate client for this request
 	client := p.getClient(req)
 
 	// Create a context with timeout
-	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	reqCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
 	tags, err := client.ListTags(reqCtx, repository)
@@ -163,19 +218,46 @@ func (p *ToolProvider) ListTags(_ context.Context, req mcp.CallToolRequest) (*mc
 	}
 
 	if len(tags) == 0 {
-		return mcp.NewToolResultText(fmt.Sprintf("No tags found for repository %s", repository)), nil
+		result := ListTagsResult{Tags: []string{}, TotalCount: 0, Sort: sortOrder}
+		return mcp.NewToolResultStructured(result,
+			fmt.Sprintf("No tags found for repository %s", repository)), nil
 	}
 
-	resultJSON, err := json.MarshalIndent(tags, "", "  ")
+	// Sort
+	sorted := sortTags(tags, sortOrder)
+
+	// Validate offset
+	if offset >= len(sorted) {
+		return mcp.NewToolResultError(fmt.Sprintf(
+			"cursor offset %d is beyond the end of %d tags", offset, len(sorted),
+		)), nil
+	}
+
+	// Paginate
+	page, nextOffset := paginateTags(sorted, offset, limit)
+
+	// Build result
+	result := ListTagsResult{
+		Tags:       page,
+		TotalCount: len(sorted),
+		Sort:       sortOrder,
+	}
+	if nextOffset > 0 {
+		result.NextCursor = encodeCursor(nextOffset, sortOrder)
+	}
+
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return mcp.NewToolResultErrorFromErr("failed to marshal result", err), nil
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf("Tags for %s:\n\n```json\n%s\n```", repository, string(resultJSON))), nil
+	fallback := fmt.Sprintf("Tags for %s (showing %d of %d, sorted by %s):\n\n```json\n%s\n```",
+		repository, len(page), len(sorted), sortOrder, string(resultJSON))
+	return mcp.NewToolResultStructured(result, fallback), nil
 }
 
 // GetImageManifest handles the get_image_manifest tool.
-func (p *ToolProvider) GetImageManifest(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (p *ToolProvider) GetImageManifest(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	imageRef := mcp.ParseString(req, "image_ref", "")
 	if imageRef == "" {
 		return mcp.NewToolResultError("image_ref is required"), nil
@@ -185,7 +267,7 @@ func (p *ToolProvider) GetImageManifest(_ context.Context, req mcp.CallToolReque
 	client := p.getClient(req)
 
 	// Create a context with timeout
-	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	reqCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
 	manifest, err := client.GetImageManifest(reqCtx, imageRef)
@@ -198,11 +280,12 @@ func (p *ToolProvider) GetImageManifest(_ context.Context, req mcp.CallToolReque
 		return mcp.NewToolResultErrorFromErr("failed to marshal result", err), nil
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf("Manifest for %s:\n\n```json\n%s\n```", imageRef, string(resultJSON))), nil
+	fallback := fmt.Sprintf("Manifest for %s:\n\n```json\n%s\n```", imageRef, string(resultJSON))
+	return mcp.NewToolResultStructured(manifest, fallback), nil
 }
 
 // GetImageConfig handles the get_image_config tool.
-func (p *ToolProvider) GetImageConfig(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (p *ToolProvider) GetImageConfig(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	imageRef := mcp.ParseString(req, "image_ref", "")
 	if imageRef == "" {
 		return mcp.NewToolResultError("image_ref is required"), nil
@@ -212,7 +295,7 @@ func (p *ToolProvider) GetImageConfig(_ context.Context, req mcp.CallToolRequest
 	client := p.getClient(req)
 
 	// Create a context with timeout
-	reqCtx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	reqCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
 	config, err := client.GetImageConfig(reqCtx, imageRef)
@@ -225,5 +308,6 @@ func (p *ToolProvider) GetImageConfig(_ context.Context, req mcp.CallToolRequest
 		return mcp.NewToolResultErrorFromErr("failed to marshal result", err), nil
 	}
 
-	return mcp.NewToolResultText(fmt.Sprintf("Config for %s:\n\n```json\n%s\n```", imageRef, string(resultJSON))), nil
+	fallback := fmt.Sprintf("Config for %s:\n\n```json\n%s\n```", imageRef, string(resultJSON))
+	return mcp.NewToolResultStructured(config, fallback), nil
 }
