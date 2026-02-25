@@ -93,8 +93,10 @@ func setupServer(serverName, serverVersion string) *mcpserver.MCPServer {
 	// Create the tool provider with a factory that creates clients per-request
 	toolProvider := mcp.NewToolProviderWithFactory(createOCIClientFromHeaders)
 
-	// Create the MCP server
-	server := mcpserver.NewMCPServer(serverName, serverVersion)
+	// Create the MCP server with protocol-level pagination for tools/list responses
+	server := mcpserver.NewMCPServer(serverName, serverVersion,
+		mcpserver.WithPaginationLimit(100),
+	)
 
 	// Add the tools to the server
 	for _, tool := range toolProvider.GetTools() {
@@ -190,12 +192,12 @@ func getMCPServerPort() int {
 
 	port, err := strconv.Atoi(envPort)
 	if err != nil {
-		log.Printf("Invalid MCP_PORT value: %s (must be a valid number), using default port 8080", envPort)
+		log.Printf("Invalid MCP_PORT value (must be a valid number), using default port %d", defaultPort)
 		return defaultPort
 	}
 
 	if !validatePort(port) {
-		log.Printf("Invalid MCP_PORT value: %s (must be between 0 and 65535), using default port 8080", envPort)
+		log.Printf("Invalid MCP_PORT value (must be between 0 and 65535), using default port %d", defaultPort)
 		return defaultPort
 	}
 
@@ -218,8 +220,7 @@ func getDefaultTransport() string {
 
 	// Validate the transport value
 	if transport != transportSSE && transport != transportStreamableHTTP {
-		log.Printf("Invalid MCP_TRANSPORT: %s, using default: %s",
-			transportEnv, defaultTransport)
+		log.Printf("Invalid MCP_TRANSPORT value, using default: %s", defaultTransport)
 		return defaultTransport
 	}
 

@@ -36,7 +36,7 @@ func TestGetMCPServerPort(t *testing.T) {
 			name:           "invalid format",
 			envValue:       "not-a-number",
 			want:           8080,
-			wantLogMessage: "Invalid MCP_PORT value: not-a-number (must be a valid number), using default port 8080",
+			wantLogMessage: "Invalid MCP_PORT value (must be a valid number), using default port 8080",
 		},
 		{
 			name:           "zero port",
@@ -48,13 +48,13 @@ func TestGetMCPServerPort(t *testing.T) {
 			name:           "negative port",
 			envValue:       "-1",
 			want:           8080,
-			wantLogMessage: "Invalid MCP_PORT value: -1 (must be between 0 and 65535), using default port 8080",
+			wantLogMessage: "Invalid MCP_PORT value (must be between 0 and 65535), using default port 8080",
 		},
 		{
 			name:           "port too large",
 			envValue:       "65536",
 			want:           8080,
-			wantLogMessage: "Invalid MCP_PORT value: 65536 (must be between 0 and 65535), using default port 8080",
+			wantLogMessage: "Invalid MCP_PORT value (must be between 0 and 65535), using default port 8080",
 		},
 		{
 			name:           "max valid port",

@@ -37,6 +37,15 @@ func WithDefaultKeychain() remote.Option {
 	return remote.WithAuthFromKeychain(authn.DefaultKeychain)
 }
 
+// optionsWith returns a new slice containing c.options plus the given extras,
+// avoiding mutation of the original backing array under concurrent use.
+func (c *Client) optionsWith(extras ...remote.Option) []remote.Option {
+	opts := make([]remote.Option, 0, len(c.options)+len(extras))
+	opts = append(opts, c.options...)
+	opts = append(opts, extras...)
+	return opts
+}
+
 // WithBearerToken returns a remote.Option for token-based authentication.
 func WithBearerToken(token string) remote.Option {
 	return remote.WithAuth(&authn.Bearer{
@@ -51,7 +60,7 @@ func (c *Client) GetImage(ctx context.Context, imageRef string) (v1.Image, error
 		return nil, fmt.Errorf("parsing image reference: %w", err)
 	}
 
-	options := append(c.options, remote.WithContext(ctx))
+	options := c.optionsWith(remote.WithContext(ctx))
 	img, err := remote.Image(ref, options...)
 	if err != nil {
 		return nil, fmt.Errorf("fetching image: %w", err)
@@ -97,7 +106,7 @@ func (c *Client) ListTags(ctx context.Context, repoName string) ([]string, error
 		return nil, fmt.Errorf("parsing repository name: %w", err)
 	}
 
-	options := append(c.options, remote.WithContext(ctx))
+	options := c.optionsWith(remote.WithContext(ctx))
 	tags, err := remote.List(repo, options...)
 	if err != nil {
 		return nil, fmt.Errorf("listing tags: %w", err)
