@@ -45,6 +45,8 @@ func TestGetTools_Annotations(t *testing.T) {
 			require.NotNil(t, tool.Annotations, "tool %s should have annotations", tool.Name)
 			require.NotNil(t, tool.Annotations.ReadOnlyHint, "tool %s should have ReadOnlyHint", tool.Name)
 			assert.True(t, *tool.Annotations.ReadOnlyHint, "tool %s should be read-only", tool.Name)
+			require.NotNil(t, tool.Annotations.DestructiveHint, "tool %s should have DestructiveHint", tool.Name)
+			assert.False(t, *tool.Annotations.DestructiveHint, "tool %s should not be destructive", tool.Name)
 			require.NotNil(t, tool.Annotations.OpenWorldHint, "tool %s should have OpenWorldHint", tool.Name)
 			assert.True(t, *tool.Annotations.OpenWorldHint, "tool %s should be open-world", tool.Name)
 		})

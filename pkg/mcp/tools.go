@@ -70,6 +70,7 @@ func (*ToolProvider) GetTools() []mcp.Tool {
 			),
 			mcp.WithOutputSchema[ImageInfoResult](),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		mcp.NewTool(
@@ -91,6 +92,7 @@ func (*ToolProvider) GetTools() []mcp.Tool {
 			),
 			mcp.WithOutputSchema[ListTagsResult](),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		mcp.NewTool(
@@ -101,6 +103,7 @@ func (*ToolProvider) GetTools() []mcp.Tool {
 				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		mcp.NewTool(
@@ -111,6 +114,7 @@ func (*ToolProvider) GetTools() []mcp.Tool {
 				mcp.Required(),
 			),
 			mcp.WithReadOnlyHintAnnotation(true),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithOpenWorldHintAnnotation(true),
 		),
 	}
