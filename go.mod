@@ -6,7 +6,7 @@ require (
 	github.com/google/go-containerregistry v0.21.2
 	github.com/mark3labs/mcp-go v0.45.0
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/mod v0.33.0
+	golang.org/x/mod v0.34.0
 )
 
 require (
