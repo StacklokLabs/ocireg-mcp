@@ -35,6 +35,7 @@ var (
 // setupContextWithGracefulShutdown creates a cancellable context and configures signal handling
 // for graceful shutdown on SIGINT and SIGTERM signals
 func setupContextWithGracefulShutdown() (context.Context, context.CancelFunc) {
+	//nolint:gosec // G118 - cancel is returned to caller
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Set up signal handling for graceful shutdown
@@ -109,6 +110,10 @@ func setupServer(serverName, serverVersion string) *mcpserver.MCPServer {
 			server.AddTool(tool, toolProvider.GetImageManifest)
 		case mcp.GetImageConfigToolName:
 			server.AddTool(tool, toolProvider.GetImageConfig)
+		case mcp.ListReferrersToolName:
+			server.AddTool(tool, toolProvider.ListReferrers)
+		case mcp.GetReferrerContentToolName:
+			server.AddTool(tool, toolProvider.GetReferrerContent)
 		}
 	}
 

@@ -4,11 +4,13 @@ package oci
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
 // Client provides methods for interacting with OCI registries.
@@ -97,6 +99,87 @@ func (c *Client) GetImageConfig(ctx context.Context, imageRef string) (*v1.Confi
 	}
 
 	return config, nil
+}
+
+// ListReferrers lists OCI artifacts that refer to the given image via the Referrers API.
+// If artifactTypeFilter is non-empty, only referrers matching that artifact type are returned.
+func (c *Client) ListReferrers(ctx context.Context, imageRef, artifactTypeFilter string) (*v1.IndexManifest, error) {
+	ref, err := name.ParseReference(imageRef)
+	if err != nil {
+		return nil, fmt.Errorf("parsing image reference: %w", err)
+	}
+
+	options := c.optionsWith(remote.WithContext(ctx))
+
+	// Resolve to a digest reference if it's a tag
+	digestRef, ok := ref.(name.Digest)
+	if !ok {
+		desc, err := remote.Head(ref, options...)
+		if err != nil {
+			return nil, fmt.Errorf("resolving image digest: %w", err)
+		}
+		digestRef = ref.Context().Digest(desc.Digest.String())
+	}
+
+	// Add artifact type filter if provided
+	if artifactTypeFilter != "" {
+		options = append(options, remote.WithFilter("artifactType", artifactTypeFilter))
+	}
+
+	idx, err := remote.Referrers(digestRef, options...)
+	if err != nil {
+		return nil, fmt.Errorf("listing referrers: %w", err)
+	}
+
+	indexManifest, err := idx.IndexManifest()
+	if err != nil {
+		return nil, fmt.Errorf("getting index manifest: %w", err)
+	}
+
+	return indexManifest, nil
+}
+
+// GetArtifactContent fetches the content of an artifact by repository and digest.
+// It returns the first layer's content, its media type, and any error.
+func (c *Client) GetArtifactContent(ctx context.Context, repo, digest string) ([]byte, types.MediaType, error) {
+	ref, err := name.NewDigest(repo + "@" + digest)
+	if err != nil {
+		return nil, "", fmt.Errorf("parsing artifact reference: %w", err)
+	}
+
+	options := c.optionsWith(remote.WithContext(ctx))
+	img, err := remote.Image(ref, options...)
+	if err != nil {
+		return nil, "", fmt.Errorf("fetching artifact: %w", err)
+	}
+
+	layers, err := img.Layers()
+	if err != nil {
+		return nil, "", fmt.Errorf("getting artifact layers: %w", err)
+	}
+
+	if len(layers) == 0 {
+		return nil, "", fmt.Errorf("artifact has no layers")
+	}
+
+	layer := layers[0]
+	mediaType, err := layer.MediaType()
+	if err != nil {
+		return nil, "", fmt.Errorf("getting layer media type: %w", err)
+	}
+
+	rc, err := layer.Compressed()
+	if err != nil {
+		return nil, "", fmt.Errorf("reading layer content: %w", err)
+	}
+	defer rc.Close()
+
+	content, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, "", fmt.Errorf("reading layer content: %w", err)
+	}
+
+	return content, mediaType, nil
 }
 
 // ListTags lists all tags for a repository.
