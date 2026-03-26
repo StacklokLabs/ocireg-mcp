@@ -446,6 +446,13 @@ type dsseEnvelope struct {
 	Signatures  json.RawMessage `json:"signatures"`
 }
 
+// sigstoreBundle represents the Sigstore bundle format (v0.3+).
+// Attestations have a nested dsseEnvelope; signatures use messageSignature.
+type sigstoreBundle struct {
+	MediaType    string        `json:"mediaType"`
+	DSSEEnvelope *dsseEnvelope `json:"dsseEnvelope,omitempty"`
+}
+
 // inTotoStatement represents the top-level fields of an in-toto statement.
 type inTotoStatement struct {
 	Type          string `json:"_type"`
@@ -460,18 +467,10 @@ type dsseDecodeResult struct {
 	decoded       bool
 }
 
-// tryDecodeDSSE attempts to unwrap a DSSE envelope from raw content.
-// If the content is a valid DSSE envelope, it returns the decoded payload.
-// Otherwise it returns the original content unchanged.
-func tryDecodeDSSE(content []byte, originalMIME string) dsseDecodeResult {
-	var envelope dsseEnvelope
-	if err := json.Unmarshal(content, &envelope); err != nil {
-		return dsseDecodeResult{payload: content, mimeType: originalMIME}
-	}
-	if envelope.PayloadType == "" || envelope.Payload == "" {
-		return dsseDecodeResult{payload: content, mimeType: originalMIME}
-	}
-
+// decodeDSSEEnvelope decodes a DSSE envelope and returns the result.
+func decodeDSSEEnvelope(
+	envelope *dsseEnvelope, content []byte, originalMIME string,
+) dsseDecodeResult {
 	decoded, err := base64.StdEncoding.DecodeString(envelope.Payload)
 	if err != nil {
 		return dsseDecodeResult{payload: content, mimeType: originalMIME}
@@ -489,6 +488,36 @@ func tryDecodeDSSE(content []byte, originalMIME string) dsseDecodeResult {
 	}
 
 	return result
+}
+
+// tryDecodeDSSE attempts to unwrap a DSSE envelope from raw content.
+// It handles both top-level DSSE envelopes (legacy cosign) and
+// Sigstore bundles (v0.3+) where the envelope is nested in dsseEnvelope.
+// If no DSSE envelope is found, returns the original content unchanged.
+func tryDecodeDSSE(content []byte, originalMIME string) dsseDecodeResult {
+	fallback := dsseDecodeResult{payload: content, mimeType: originalMIME}
+
+	// Try top-level DSSE envelope (legacy cosign format)
+	var envelope dsseEnvelope
+	if err := json.Unmarshal(content, &envelope); err == nil {
+		if envelope.PayloadType != "" && envelope.Payload != "" {
+			return decodeDSSEEnvelope(
+				&envelope, content, originalMIME)
+		}
+	}
+
+	// Try Sigstore bundle format (v0.3+) with nested dsseEnvelope
+	var bundle sigstoreBundle
+	if err := json.Unmarshal(content, &bundle); err == nil {
+		if bundle.DSSEEnvelope != nil &&
+			bundle.DSSEEnvelope.PayloadType != "" &&
+			bundle.DSSEEnvelope.Payload != "" {
+			return decodeDSSEEnvelope(
+				bundle.DSSEEnvelope, content, originalMIME)
+		}
+	}
+
+	return fallback
 }
 
 // validContentTypes is the set of accepted content_type hint values.

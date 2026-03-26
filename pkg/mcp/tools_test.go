@@ -1,6 +1,8 @@
 package mcp
 
 import (
+	"encoding/base64"
+	"fmt"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -352,17 +354,82 @@ func TestDetectContentFormat(t *testing.T) {
 	}
 }
 
-func TestDecodeDSSEEnvelope(t *testing.T) {
-	// This tests the DSSE decoding logic indirectly through detectContentFormat
-	// and the handler. The actual DSSE decoding is embedded in GetReferrerContent.
-	// Here we test the format detection which is the deterministic part.
+func TestDetectOutputMIMEType(t *testing.T) {
+	assert.Equal(t, "application/vnd.cyclonedx+json", detectOutputMIMEType("", "cyclonedx"))
+	assert.Equal(t, "application/spdx+json", detectOutputMIMEType("", "spdx"))
+	assert.Equal(t, "application/json", detectOutputMIMEType("", "slsa"))
+	assert.Equal(t, "application/json", detectOutputMIMEType("", "openvex"))
+	assert.Equal(t, "text/plain", detectOutputMIMEType("text/plain", ""))
+	assert.Equal(t, "application/octet-stream", detectOutputMIMEType("", ""))
+}
 
-	t.Run("detectOutputMIMEType", func(t *testing.T) {
-		assert.Equal(t, "application/vnd.cyclonedx+json", detectOutputMIMEType("", "cyclonedx"))
-		assert.Equal(t, "application/spdx+json", detectOutputMIMEType("", "spdx"))
-		assert.Equal(t, "application/json", detectOutputMIMEType("", "slsa"))
-		assert.Equal(t, "application/json", detectOutputMIMEType("", "openvex"))
-		assert.Equal(t, "text/plain", detectOutputMIMEType("text/plain", ""))
-		assert.Equal(t, "application/octet-stream", detectOutputMIMEType("", ""))
-	})
+func TestTryDecodeDSSE_LegacyEnvelope(t *testing.T) {
+	// Simulate a legacy cosign DSSE envelope with an in-toto SLSA provenance
+	statement := `{"_type":"https://in-toto.io/Statement/v1","predicateType":"https://slsa.dev/provenance/v1","predicate":{}}`
+	payload := base64.StdEncoding.EncodeToString([]byte(statement))
+	envelope := fmt.Sprintf(
+		`{"payloadType":"application/vnd.in-toto+json","payload":"%s","signatures":[]}`,
+		payload,
+	)
+
+	result := tryDecodeDSSE([]byte(envelope), "application/octet-stream")
+	assert.True(t, result.decoded)
+	assert.Equal(t, "application/vnd.in-toto+json", result.mimeType)
+	assert.Equal(t, "https://slsa.dev/provenance/v1", result.predicateType)
+	assert.JSONEq(t, statement, string(result.payload))
+}
+
+func TestTryDecodeDSSE_SigstoreBundle(t *testing.T) {
+	// Simulate a Sigstore bundle (v0.3+) with nested dsseEnvelope
+	statement := `{"_type":"https://in-toto.io/Statement/v1","predicateType":"https://cyclonedx.org/bom","predicate":{}}`
+	payload := base64.StdEncoding.EncodeToString([]byte(statement))
+	bundle := fmt.Sprintf(`{
+		"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json",
+		"verificationMaterial":{"certificate":{}},
+		"dsseEnvelope":{
+			"payloadType":"application/vnd.in-toto+json",
+			"payload":"%s",
+			"signatures":[]
+		}
+	}`, payload)
+
+	result := tryDecodeDSSE([]byte(bundle), "application/octet-stream")
+	assert.True(t, result.decoded)
+	assert.Equal(t, "application/vnd.in-toto+json", result.mimeType)
+	assert.Equal(t, "https://cyclonedx.org/bom", result.predicateType)
+	assert.JSONEq(t, statement, string(result.payload))
+}
+
+func TestTryDecodeDSSE_SigstoreBundleSignature(t *testing.T) {
+	// A Sigstore bundle for a signature (no dsseEnvelope, has messageSignature)
+	bundle := `{
+		"mediaType":"application/vnd.dev.sigstore.bundle.v0.3+json",
+		"verificationMaterial":{"certificate":{}},
+		"messageSignature":{"messageDigest":{"algorithm":"SHA2_256","digest":"abc"}}
+	}`
+
+	result := tryDecodeDSSE(
+		[]byte(bundle), "application/vnd.dev.sigstore.bundle.v0.3+json")
+	assert.False(t, result.decoded)
+	assert.Equal(t,
+		"application/vnd.dev.sigstore.bundle.v0.3+json", result.mimeType)
+}
+
+func TestTryDecodeDSSE_NotDSSE(t *testing.T) {
+	// Plain JSON that isn't a DSSE envelope or bundle
+	content := `{"name":"test","version":"1.0"}`
+
+	result := tryDecodeDSSE([]byte(content), "application/json")
+	assert.False(t, result.decoded)
+	assert.Equal(t, "application/json", result.mimeType)
+	assert.Equal(t, content, string(result.payload))
+}
+
+func TestTryDecodeDSSE_InvalidBase64(t *testing.T) {
+	// DSSE envelope with invalid base64 payload — should fall back
+	envelope := `{"payloadType":"application/vnd.in-toto+json","payload":"!!!not-base64!!!","signatures":[]}`
+
+	result := tryDecodeDSSE([]byte(envelope), "application/octet-stream")
+	assert.False(t, result.decoded)
+	assert.Equal(t, "application/octet-stream", result.mimeType)
 }
