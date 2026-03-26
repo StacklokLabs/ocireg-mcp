@@ -4,11 +4,13 @@ package oci
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
 // Client provides methods for interacting with OCI registries.
@@ -97,6 +99,157 @@ func (c *Client) GetImageConfig(ctx context.Context, imageRef string) (*v1.Confi
 	}
 
 	return config, nil
+}
+
+// ListReferrers lists OCI artifacts that refer to the given image via the Referrers API.
+// If artifactTypeFilter is non-empty, only referrers matching that artifact type are returned.
+func (c *Client) ListReferrers(
+	ctx context.Context, imageRef, artifactTypeFilter string,
+) (*v1.IndexManifest, error) {
+	repo, digest, err := c.ResolveDigest(ctx, imageRef)
+	if err != nil {
+		return nil, err
+	}
+
+	digestRef := repo.Digest(digest.String())
+	options := c.optionsWith(remote.WithContext(ctx))
+
+	if artifactTypeFilter != "" {
+		options = append(options,
+			remote.WithFilter("artifactType", artifactTypeFilter))
+	}
+
+	idx, err := remote.Referrers(digestRef, options...)
+	if err != nil {
+		return nil, fmt.Errorf("listing referrers: %w", err)
+	}
+
+	indexManifest, err := idx.IndexManifest()
+	if err != nil {
+		return nil, fmt.Errorf("getting index manifest: %w", err)
+	}
+
+	return indexManifest, nil
+}
+
+// LegacyCosignArtifact represents an artifact found via legacy cosign tag scheme.
+type LegacyCosignArtifact struct {
+	Digest       v1.Hash
+	Size         int64
+	MediaType    types.MediaType
+	ArtifactType string
+	TagSuffix    string // "sig", "att", or "sbom"
+}
+
+// legacyCosignSuffixes maps tag suffixes to their artifact types.
+var legacyCosignSuffixes = map[string]string{
+	"sig":  "application/vnd.dev.cosign.artifact.sig.v1+json",
+	"att":  "application/vnd.dsse.envelope.v1+json",
+	"sbom": "application/vnd.dev.cosign.artifact.sbom.v1+json",
+}
+
+// ListLegacyCosignArtifacts discovers artifacts stored via the legacy
+// cosign tag scheme (sha256-<hex>.sig, .att, .sbom).
+func (c *Client) ListLegacyCosignArtifacts(
+	ctx context.Context, repo name.Repository, imageDigest v1.Hash,
+) []LegacyCosignArtifact {
+	options := c.optionsWith(remote.WithContext(ctx))
+	hex := imageDigest.Hex
+
+	var artifacts []LegacyCosignArtifact
+	for suffix, artifactType := range legacyCosignSuffixes {
+		tagName := fmt.Sprintf("sha256-%s.%s", hex, suffix)
+		tag := repo.Tag(tagName)
+
+		desc, err := remote.Head(tag, options...)
+		if err != nil {
+			continue
+		}
+
+		artifacts = append(artifacts, LegacyCosignArtifact{
+			Digest:       desc.Digest,
+			Size:         desc.Size,
+			MediaType:    desc.MediaType,
+			ArtifactType: artifactType,
+			TagSuffix:    suffix,
+		})
+	}
+
+	return artifacts
+}
+
+// ResolveDigest resolves an image reference to a digest and repository.
+func (c *Client) ResolveDigest(
+	ctx context.Context, imageRef string,
+) (name.Repository, v1.Hash, error) {
+	ref, err := name.ParseReference(imageRef)
+	if err != nil {
+		return name.Repository{}, v1.Hash{},
+			fmt.Errorf("parsing image reference: %w", err)
+	}
+
+	options := c.optionsWith(remote.WithContext(ctx))
+
+	digestRef, ok := ref.(name.Digest)
+	if ok {
+		digest, err := v1.NewHash(digestRef.Identifier())
+		if err != nil {
+			return name.Repository{}, v1.Hash{},
+				fmt.Errorf("parsing digest: %w", err)
+		}
+		return ref.Context(), digest, nil
+	}
+
+	desc, err := remote.Head(ref, options...)
+	if err != nil {
+		return name.Repository{}, v1.Hash{},
+			fmt.Errorf("resolving image digest: %w", err)
+	}
+
+	return ref.Context(), desc.Digest, nil
+}
+
+// GetArtifactContent fetches the content of an artifact by repository and digest.
+// It returns the first layer's content, its media type, and any error.
+func (c *Client) GetArtifactContent(ctx context.Context, repo, digest string) ([]byte, types.MediaType, error) {
+	ref, err := name.NewDigest(repo + "@" + digest)
+	if err != nil {
+		return nil, "", fmt.Errorf("parsing artifact reference: %w", err)
+	}
+
+	options := c.optionsWith(remote.WithContext(ctx))
+	img, err := remote.Image(ref, options...)
+	if err != nil {
+		return nil, "", fmt.Errorf("fetching artifact: %w", err)
+	}
+
+	layers, err := img.Layers()
+	if err != nil {
+		return nil, "", fmt.Errorf("getting artifact layers: %w", err)
+	}
+
+	if len(layers) == 0 {
+		return nil, "", fmt.Errorf("artifact has no layers")
+	}
+
+	layer := layers[0]
+	mediaType, err := layer.MediaType()
+	if err != nil {
+		return nil, "", fmt.Errorf("getting layer media type: %w", err)
+	}
+
+	rc, err := layer.Compressed()
+	if err != nil {
+		return nil, "", fmt.Errorf("reading layer content: %w", err)
+	}
+	defer rc.Close()
+
+	content, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, "", fmt.Errorf("reading layer content: %w", err)
+	}
+
+	return content, mediaType, nil
 }
 
 // ListTags lists all tags for a repository.

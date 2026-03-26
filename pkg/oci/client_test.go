@@ -1,7 +1,6 @@
 package oci
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,30 +18,51 @@ func TestNewClient(t *testing.T) {
 
 func TestGetImage_InvalidReference(t *testing.T) {
 	client := NewClient()
-	_, err := client.GetImage(context.Background(), "invalid:reference:format")
+	_, err := client.GetImage(t.Context(), "invalid:reference:format")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "parsing image reference")
 }
 
 func TestGetImageManifest_InvalidReference(t *testing.T) {
 	client := NewClient()
-	_, err := client.GetImageManifest(context.Background(), "invalid:reference:format")
+	_, err := client.GetImageManifest(t.Context(), "invalid:reference:format")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "parsing image reference")
 }
 
 func TestGetImageConfig_InvalidReference(t *testing.T) {
 	client := NewClient()
-	_, err := client.GetImageConfig(context.Background(), "invalid:reference:format")
+	_, err := client.GetImageConfig(t.Context(), "invalid:reference:format")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "parsing image reference")
 }
 
 func TestListTags_InvalidRepository(t *testing.T) {
 	client := NewClient()
-	_, err := client.ListTags(context.Background(), "invalid/repo/format")
+	_, err := client.ListTags(t.Context(), "invalid/repo/format")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "listing tags")
+}
+
+func TestListReferrers_InvalidReference(t *testing.T) {
+	client := NewClient()
+	_, err := client.ListReferrers(t.Context(), "invalid:reference:format", "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parsing image reference")
+}
+
+func TestGetArtifactContent_InvalidDigest(t *testing.T) {
+	client := NewClient()
+	_, _, err := client.GetArtifactContent(t.Context(), "docker.io/library/alpine", "notadigest")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parsing artifact reference")
+}
+
+func TestGetArtifactContent_InvalidRepo(t *testing.T) {
+	client := NewClient()
+	_, _, err := client.GetArtifactContent(t.Context(), "INVALID", "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parsing artifact reference")
 }
 
 func TestWithBearerToken(t *testing.T) {
