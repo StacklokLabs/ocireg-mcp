@@ -395,8 +395,14 @@ func (p *ToolProvider) GetImageConfig(ctx context.Context, req mcp.CallToolReque
 	return mcp.NewToolResultStructured(config, fallback), nil
 }
 
+// legacyCosignAnnotation is added to referrers discovered via legacy
+// cosign tag scheme to distinguish them from OCI 1.1 referrers.
+const legacyCosignAnnotation = "dev.cosign.legacy.tag"
+
 // ListReferrers handles the list_referrers tool.
-func (p *ToolProvider) ListReferrers(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (p *ToolProvider) ListReferrers(
+	ctx context.Context, req mcp.CallToolRequest,
+) (*mcp.CallToolResult, error) {
 	imageRef := mcp.ParseString(req, "image_ref", "")
 	if imageRef == "" {
 		return mcp.NewToolResultError("image_ref is required"), nil
@@ -409,9 +415,11 @@ func (p *ToolProvider) ListReferrers(ctx context.Context, req mcp.CallToolReques
 	reqCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	defer cancel()
 
-	indexManifest, err := client.ListReferrers(reqCtx, imageRef, artifactType)
+	indexManifest, err := client.ListReferrers(
+		reqCtx, imageRef, artifactType)
 	if err != nil {
-		return mcp.NewToolResultErrorFromErr("failed to list referrers", err), nil
+		return mcp.NewToolResultErrorFromErr(
+			"failed to list referrers", err), nil
 	}
 
 	referrers := make([]ReferrerDescriptor, 0, len(indexManifest.Manifests))
@@ -423,6 +431,30 @@ func (p *ToolProvider) ListReferrers(ctx context.Context, req mcp.CallToolReques
 			ArtifactType: desc.ArtifactType,
 			Annotations:  desc.Annotations,
 		})
+	}
+
+	// Also discover legacy cosign tag artifacts (.sig, .att, .sbom)
+	repo, digest, err := client.ResolveDigest(reqCtx, imageRef)
+	if err == nil {
+		legacyArtifacts := client.ListLegacyCosignArtifacts(
+			reqCtx, repo, digest)
+		for _, la := range legacyArtifacts {
+			// Skip if artifact_type filter doesn't match
+			if artifactType != "" && la.ArtifactType != artifactType {
+				continue
+			}
+			tagName := fmt.Sprintf(
+				"sha256-%s.%s", digest.Hex, la.TagSuffix)
+			referrers = append(referrers, ReferrerDescriptor{
+				MediaType:    string(la.MediaType),
+				Digest:       la.Digest.String(),
+				Size:         la.Size,
+				ArtifactType: la.ArtifactType,
+				Annotations: map[string]string{
+					legacyCosignAnnotation: tagName,
+				},
+			})
+		}
 	}
 
 	result := ListReferrersResult{
