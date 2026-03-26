@@ -4,7 +4,7 @@ go 1.25.7
 
 require (
 	github.com/google/go-containerregistry v0.21.3
-	github.com/mark3labs/mcp-go v0.45.0
+	github.com/mark3labs/mcp-go v0.46.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/mod v0.34.0
 )
@@ -17,6 +17,7 @@ require (
 	github.com/docker/cli v29.3.0+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.3 // indirect
+	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/klauspost/compress v1.18.4 // indirect
