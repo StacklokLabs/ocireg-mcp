@@ -4,6 +4,10 @@
 An MCP (Model Context Protocol) server that provides tools for querying OCI
 registries and image references.
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/stackloklabs-ocireg-mcp).
+
 ## Overview
 
 This project implements an SSE-based MCP server that allows LLM-powered
