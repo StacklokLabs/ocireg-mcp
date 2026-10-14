@@ -7,6 +7,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Tag names shared by the sortTags tests.
+const (
+	tagApple   = "apple"
+	tagMango   = "mango"
+	tagZebra   = "zebra"
+	tagLatest  = "latest"
+	tagBeta    = "beta"
+	tagNightly = "nightly"
+	tagV1      = "v1.0.0"
+	tagV2      = "v2.0.0"
+)
+
 func TestCursorRoundTrip(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -57,42 +69,42 @@ func TestIsValidSortOrder(t *testing.T) {
 }
 
 func TestSortTags_Alphabetical(t *testing.T) {
-	tags := []string{"zebra", "apple", "mango"}
+	tags := []string{tagZebra, tagApple, tagMango}
 	result := sortTags(tags, SortAlphabetical)
-	assert.Equal(t, []string{"apple", "mango", "zebra"}, result)
+	assert.Equal(t, []string{tagApple, tagMango, tagZebra}, result)
 	// Original unchanged
-	assert.Equal(t, []string{"zebra", "apple", "mango"}, tags)
+	assert.Equal(t, []string{tagZebra, tagApple, tagMango}, tags)
 }
 
 func TestSortTags_AlphabeticalDesc(t *testing.T) {
-	tags := []string{"apple", "mango", "zebra"}
+	tags := []string{tagApple, tagMango, tagZebra}
 	result := sortTags(tags, SortAlphabeticalDesc)
-	assert.Equal(t, []string{"zebra", "mango", "apple"}, result)
+	assert.Equal(t, []string{tagZebra, tagMango, tagApple}, result)
 }
 
 func TestSortTags_Semver(t *testing.T) {
-	tags := []string{"v2.0.0", "v1.0.0", "latest"}
+	tags := []string{tagV2, tagV1, tagLatest}
 	result := sortTags(tags, SortSemver)
-	assert.Equal(t, []string{"v1.0.0", "v2.0.0", "latest"}, result)
+	assert.Equal(t, []string{tagV1, tagV2, tagLatest}, result)
 }
 
 func TestSortTags_SemverDesc(t *testing.T) {
-	tags := []string{"v1.0.0", "v2.0.0", "latest", "beta"}
+	tags := []string{tagV1, tagV2, tagLatest, tagBeta}
 	result := sortTags(tags, SortSemverDesc)
 	// Semver tags descending, then non-semver tags descending alphabetically
-	assert.Equal(t, []string{"v2.0.0", "v1.0.0", "latest", "beta"}, result)
+	assert.Equal(t, []string{tagV2, tagV1, tagLatest, tagBeta}, result)
 }
 
 func TestSortTags_SemverMixedVPrefix(t *testing.T) {
-	tags := []string{"2.0.0", "v1.0.0", "1.5.0"}
+	tags := []string{"2.0.0", tagV1, "1.5.0"}
 	result := sortTags(tags, SortSemver)
-	assert.Equal(t, []string{"v1.0.0", "1.5.0", "2.0.0"}, result)
+	assert.Equal(t, []string{tagV1, "1.5.0", "2.0.0"}, result)
 }
 
 func TestSortTags_AllNonSemver(t *testing.T) {
-	tags := []string{"latest", "nightly", "beta"}
+	tags := []string{tagLatest, tagNightly, tagBeta}
 	result := sortTags(tags, SortSemver)
-	assert.Equal(t, []string{"beta", "latest", "nightly"}, result)
+	assert.Equal(t, []string{tagBeta, tagLatest, tagNightly}, result)
 }
 
 func TestSortTags_Empty(t *testing.T) {
@@ -101,8 +113,8 @@ func TestSortTags_Empty(t *testing.T) {
 }
 
 func TestSortTags_Single(t *testing.T) {
-	result := sortTags([]string{"v1.0.0"}, SortSemver)
-	assert.Equal(t, []string{"v1.0.0"}, result)
+	result := sortTags([]string{tagV1}, SortSemver)
+	assert.Equal(t, []string{tagV1}, result)
 }
 
 func TestPaginateTags_FirstPage(t *testing.T) {
