@@ -1,6 +1,6 @@
 module github.com/StacklokLabs/ocireg-mcp
 
-go 1.26.9
+go 1.27
 
 require (
 	github.com/google/go-containerregistry v0.22.1
