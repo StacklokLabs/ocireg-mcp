@@ -12,6 +12,11 @@ import (
 	"github.com/StacklokLabs/ocireg-mcp/pkg/oci"
 )
 
+const (
+	argRepository  = "repository"
+	testAlpineRepo = "docker.io/library/alpine"
+)
+
 func TestNewToolProvider(t *testing.T) {
 	client := oci.NewClient()
 	provider := NewToolProvider(client)
@@ -96,8 +101,8 @@ func TestListTags_InvalidSort(t *testing.T) {
 
 	req := mcp.CallToolRequest{}
 	req.Params.Arguments = map[string]interface{}{
-		"repository": "docker.io/library/alpine",
-		"sort":       "invalid-sort",
+		argRepository: testAlpineRepo,
+		"sort":        "invalid-sort",
 	}
 
 	result, err := provider.ListTags(t.Context(), req)
@@ -114,8 +119,8 @@ func TestListTags_InvalidCursor(t *testing.T) {
 
 	req := mcp.CallToolRequest{}
 	req.Params.Arguments = map[string]interface{}{
-		"repository": "docker.io/library/alpine",
-		"cursor":     "!!!bad-cursor!!!",
+		argRepository: testAlpineRepo,
+		"cursor":      "!!!bad-cursor!!!",
 	}
 
 	result, err := provider.ListTags(t.Context(), req)
@@ -135,9 +140,9 @@ func TestListTags_SortCursorMismatch(t *testing.T) {
 
 	req := mcp.CallToolRequest{}
 	req.Params.Arguments = map[string]interface{}{
-		"repository": "docker.io/library/alpine",
-		"cursor":     cursor,
-		"sort":       SortSemver,
+		argRepository: testAlpineRepo,
+		"cursor":      cursor,
+		"sort":        SortSemver,
 	}
 
 	result, err := provider.ListTags(t.Context(), req)
@@ -157,8 +162,8 @@ func TestListTags_LimitClamping(t *testing.T) {
 	// the parameter parsing doesn't error
 	req := mcp.CallToolRequest{}
 	req.Params.Arguments = map[string]interface{}{
-		"repository": "docker.io/library/alpine",
-		"limit":      float64(-5), // JSON numbers are float64
+		argRepository: testAlpineRepo,
+		"limit":       float64(-5), // JSON numbers are float64
 	}
 
 	// This will fail at the network level, but the limit parsing should succeed
@@ -241,7 +246,7 @@ func TestGetReferrerContent_MissingDigest(t *testing.T) {
 
 	req := mcp.CallToolRequest{}
 	req.Params.Arguments = map[string]interface{}{
-		"image_ref": "docker.io/library/alpine:latest",
+		"image_ref": testAlpineRepo + ":latest",
 	}
 
 	result, err := provider.GetReferrerContent(t.Context(), req)
@@ -259,7 +264,7 @@ func TestGetReferrerContent_InvalidContentType(t *testing.T) {
 
 	req := mcp.CallToolRequest{}
 	req.Params.Arguments = map[string]interface{}{
-		"image_ref":    "docker.io/library/alpine:latest",
+		"image_ref":    testAlpineRepo + ":latest",
 		"digest":       "sha256:abc123",
 		"content_type": "invalid",
 	}
@@ -285,57 +290,57 @@ func TestDetectContentFormat(t *testing.T) {
 		{
 			name:            "CycloneDX from predicate type",
 			predicateType:   "https://cyclonedx.org/bom",
-			expectedFormat:  "cyclonedx",
-			expectedContent: "sbom",
+			expectedFormat:  formatCycloneDX,
+			expectedContent: contentTypeSBOM,
 		},
 		{
 			name:            "SPDX from predicate type",
 			predicateType:   "https://spdx.dev/Document",
-			expectedFormat:  "spdx",
-			expectedContent: "sbom",
+			expectedFormat:  formatSPDX,
+			expectedContent: contentTypeSBOM,
 		},
 		{
 			name:            "SLSA provenance from predicate type",
 			predicateType:   "https://slsa.dev/provenance/v1",
-			expectedFormat:  "slsa",
-			expectedContent: "provenance",
+			expectedFormat:  formatSLSA,
+			expectedContent: contentTypeProvenance,
 		},
 		{
 			name:            "OpenVEX from predicate type",
 			predicateType:   "https://openvex.dev/ns/v0.2.0",
-			expectedFormat:  "openvex",
-			expectedContent: "vex",
+			expectedFormat:  formatOpenVEX,
+			expectedContent: contentTypeVEX,
 		},
 		{
 			name:            "CycloneDX from mime type",
 			mimeType:        "application/vnd.cyclonedx+json",
-			expectedFormat:  "cyclonedx",
-			expectedContent: "sbom",
+			expectedFormat:  formatCycloneDX,
+			expectedContent: contentTypeSBOM,
 		},
 		{
 			name:            "SPDX from mime type",
 			mimeType:        "application/spdx+json",
-			expectedFormat:  "spdx",
-			expectedContent: "sbom",
+			expectedFormat:  formatSPDX,
+			expectedContent: contentTypeSBOM,
 		},
 		{
 			name:            "Cosign signature from mime type",
 			mimeType:        "application/vnd.dev.cosign.artifact.sig.v1+json",
-			expectedFormat:  "cosign",
-			expectedContent: "signature",
+			expectedFormat:  formatCosign,
+			expectedContent: contentTypeSignature,
 		},
 		{
 			name:            "Sigstore bundle from mime type",
 			mimeType:        "application/vnd.dev.sigstore.bundle.v0.3+json",
-			expectedFormat:  "sigstore-bundle",
+			expectedFormat:  formatSigstoreBundle,
 			expectedContent: "",
 		},
 		{
 			name:            "hint fallback",
 			mimeType:        "application/octet-stream",
-			hint:            "sbom",
+			hint:            contentTypeSBOM,
 			expectedFormat:  "",
-			expectedContent: "sbom",
+			expectedContent: contentTypeSBOM,
 		},
 		{
 			name:            "no match",
