@@ -56,8 +56,12 @@ func TestGetTools_Annotations(t *testing.T) {
 			assert.True(t, *tool.Annotations.ReadOnlyHint, "tool %s should be read-only", tool.Name)
 			require.NotNil(t, tool.Annotations.DestructiveHint, "tool %s should have DestructiveHint", tool.Name)
 			assert.False(t, *tool.Annotations.DestructiveHint, "tool %s should not be destructive", tool.Name)
+			require.NotNil(t, tool.Annotations.IdempotentHint, "tool %s should have IdempotentHint", tool.Name)
+			assert.True(t, *tool.Annotations.IdempotentHint, "tool %s should be idempotent", tool.Name)
 			require.NotNil(t, tool.Annotations.OpenWorldHint, "tool %s should have OpenWorldHint", tool.Name)
 			assert.True(t, *tool.Annotations.OpenWorldHint, "tool %s should be open-world", tool.Name)
+			assert.NotEmpty(t, tool.Title, "tool %s should have a title", tool.Name)
+			assert.Equal(t, tool.Title, tool.Annotations.Title, "tool %s title and annotation title should match", tool.Name)
 		})
 	}
 }

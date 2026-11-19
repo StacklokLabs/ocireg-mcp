@@ -264,8 +264,12 @@ func main() {
 	switch strings.ToLower(*transport) {
 	case transportStreamableHTTP:
 		log.Println("Using streamable-http transport")
-		server = mcpserver.NewStreamableHTTPServer(mcpServer)
+		// Every tool call is independent and auth comes from each request's
+		// headers, so there's no session state to keep. Stateless mode matches
+		// MCP 2026-07-28, which removed protocol-level sessions.
+		server = mcpserver.NewStreamableHTTPServer(mcpServer, mcpserver.WithStateLess(true))
 	case transportSSE:
+		log.Println("WARNING: the SSE transport is deprecated by the MCP specification; use streamable-http instead")
 		log.Println("Using SSE transport")
 		server = mcpserver.NewSSEServer(mcpServer)
 	default:

@@ -81,30 +81,47 @@ func (p *ToolProvider) getClient(req mcp.CallToolRequest) *oci.Client {
 	return p.client
 }
 
+// minimum sets the JSON Schema "minimum" keyword on a numeric property.
+// mcp-go has no built-in helper for numeric bounds.
+func minimum(v int) mcp.PropertyOption {
+	return func(schema map[string]any) { schema["minimum"] = v }
+}
+
+// maximum sets the JSON Schema "maximum" keyword on a numeric property.
+func maximum(v int) mcp.PropertyOption {
+	return func(schema map[string]any) { schema["maximum"] = v }
+}
+
 // GetTools returns the list of tools provided by this MCP server.
 func (*ToolProvider) GetTools() []mcp.Tool {
 	return []mcp.Tool{
 		mcp.NewTool(
 			GetImageInfoToolName,
+			mcp.WithToolTitle("Get Image Info"),
 			mcp.WithDescription("Get information about an OCI image"),
 			mcp.WithString("image_ref",
 				mcp.Description("The image reference (e.g., docker.io/library/alpine:latest)"),
 				mcp.Required(),
 			),
 			mcp.WithOutputSchema[ImageInfoResult](),
+			mcp.WithTitleAnnotation("Get Image Info"),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		mcp.NewTool(
 			ListTagsToolName,
+			mcp.WithToolTitle("List Tags"),
 			mcp.WithDescription("List tags for a repository with pagination support"),
 			mcp.WithString("repository",
 				mcp.Description("The repository name (e.g., docker.io/library/alpine)"),
 				mcp.Required(),
 			),
-			mcp.WithNumber("limit",
+			mcp.WithInteger("limit",
 				mcp.Description("Maximum number of tags to return per page (default: 100, max: 1000)"),
+				minimum(1),
+				maximum(MaxPageSize),
 			),
 			mcp.WithString("cursor",
 				mcp.Description("Opaque pagination cursor from a previous list_tags response"),
@@ -114,34 +131,43 @@ func (*ToolProvider) GetTools() []mcp.Tool {
 				mcp.Enum("alphabetical", "alphabetical-desc", "semver", "semver-desc"),
 			),
 			mcp.WithOutputSchema[ListTagsResult](),
+			mcp.WithTitleAnnotation("List Tags"),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		mcp.NewTool(
 			GetImageManifestToolName,
+			mcp.WithToolTitle("Get Image Manifest"),
 			mcp.WithDescription("Get the manifest for an OCI image"),
 			mcp.WithString("image_ref",
 				mcp.Description("The image reference (e.g., docker.io/library/alpine:latest)"),
 				mcp.Required(),
 			),
+			mcp.WithTitleAnnotation("Get Image Manifest"),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		mcp.NewTool(
 			GetImageConfigToolName,
+			mcp.WithToolTitle("Get Image Config"),
 			mcp.WithDescription("Get the config for an OCI image"),
 			mcp.WithString("image_ref",
 				mcp.Description("The image reference (e.g., docker.io/library/alpine:latest)"),
 				mcp.Required(),
 			),
+			mcp.WithTitleAnnotation("Get Image Config"),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
+			mcp.WithIdempotentHintAnnotation(true),
 			mcp.WithOpenWorldHintAnnotation(true),
 		),
 		mcp.NewTool(
 			ListReferrersToolName,
+			mcp.WithToolTitle("List Referrers"),
 			mcp.WithDescription(
 				"List OCI artifacts (SBOMs, signatures, provenance, VEX) attached to an image via the OCI Referrers API. "+
 					"Returns descriptors with artifact type, digest, size, and annotations. "+
@@ -154,6 +180,7 @@ func (*ToolProvider) GetTools() []mcp.Tool {
 				mcp.Description("Filter referrers by artifact type (e.g., application/vnd.cyclonedx+json)"),
 			),
 			mcp.WithOutputSchema[ListReferrersResult](),
+			mcp.WithTitleAnnotation("List Referrers"),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithIdempotentHintAnnotation(true),
@@ -161,6 +188,7 @@ func (*ToolProvider) GetTools() []mcp.Tool {
 		),
 		mcp.NewTool(
 			GetReferrerContentToolName,
+			mcp.WithToolTitle("Get Referrer Content"),
 			mcp.WithDescription(
 				"Fetch the content of a specific referrer artifact. "+
 					"Use list_referrers first to discover artifacts and their digests. "+
@@ -188,9 +216,11 @@ func (*ToolProvider) GetTools() []mcp.Tool {
 				mcp.Description("Hint about the expected content type to help label output metadata"),
 				mcp.Enum("sbom", "provenance", "vex", "signature"),
 			),
-			mcp.WithNumber("max_bytes",
+			mcp.WithInteger("max_bytes",
 				mcp.Description("Maximum payload size in bytes. Content exceeding this is truncated. Default 512KB (524288)."),
+				minimum(1),
 			),
+			mcp.WithTitleAnnotation("Get Referrer Content"),
 			mcp.WithReadOnlyHintAnnotation(true),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithIdempotentHintAnnotation(true),
