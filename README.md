@@ -6,8 +6,8 @@ registries and image references.
 
 ## Overview
 
-This project implements an SSE-based MCP server that allows LLM-powered
-applications to interact with OCI registries. It provides tools for retrieving
+This project implements an MCP server that allows LLM-powered applications to
+interact with OCI registries. It provides tools for retrieving
 information about container images, listing tags, and more.
 
 ## Features
@@ -178,6 +178,18 @@ The server can be configured to listen on a specific port using either:
      and 65535)
    - If invalid port provided it defaults to port 8080
    - Example: `./ocireg-mcp -port 9090`
+
+### Transport Configuration
+
+The server supports two transports, selected with the `-transport` flag or the
+`MCP_TRANSPORT` environment variable:
+
+- `streamable-http` (default): Serves MCP at `http://localhost:8080/mcp`. The
+  server is stateless and doesn't issue an `Mcp-Session-Id`. It supports MCP
+  protocol version `2026-07-28` and earlier versions back to `2024-11-05`.
+- `sse`: Serves the legacy HTTP+SSE transport at `/sse` and `/message`. The MCP
+  specification deprecates this transport, so use `streamable-http` for new
+  deployments.
 
 ### Testing
 
